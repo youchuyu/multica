@@ -567,7 +567,7 @@ func newIssueCommentAddTestCmd() *cobra.Command {
 	return cmd
 }
 
-func TestRunIssueCommentAddUploadsAttachmentWithoutIssueID(t *testing.T) {
+func TestRunIssueCommentAddUploadsAttachmentWithResolvedIssueID(t *testing.T) {
 	const issueRef = "MUL-1"
 	t.Chdir(t.TempDir())
 	attachmentPath := "comment.txt"
@@ -608,8 +608,8 @@ func TestRunIssueCommentAddUploadsAttachmentWithoutIssueID(t *testing.T) {
 	if err := runIssueCommentAdd(cmd, []string{issueRef}); err != nil {
 		t.Fatalf("runIssueCommentAdd: %v", err)
 	}
-	if uploadedIssueID != "" {
-		t.Fatalf("upload issue_id = %q, want empty for a comment attachment", uploadedIssueID)
+	if uploadedIssueID != "issue-1" {
+		t.Fatalf("upload issue_id = %q, want resolved issue-1 for compatibility with issue-bound comment linking", uploadedIssueID)
 	}
 	attachmentIDs, ok := commentBody["attachment_ids"].([]any)
 	if !ok || len(attachmentIDs) != 1 || attachmentIDs[0] != "attachment-1" {

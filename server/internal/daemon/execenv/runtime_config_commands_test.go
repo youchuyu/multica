@@ -6,6 +6,26 @@ import (
 	"testing"
 )
 
+func TestBriefLeavesPresentationDetailsToPlatformSkill(t *testing.T) {
+	t.Parallel()
+	for kind, ctx := range availableCommandsKinds {
+		for _, provider := range []string{"claude", "codex"} {
+			ctx.AgentSkills = []SkillContextForEnv{platformSkillFixture()}
+			brief := buildMetaSkillContent(provider, ctx)
+			for _, removed := range []string{"**Charts and diagrams:**", "Keep comments concise and natural"} {
+				if strings.Contains(brief, removed) {
+					t.Errorf("%s/%s: non-core presentation policy remains: %q", kind, provider, removed)
+				}
+			}
+			for _, kept := range []string{"## Output", "**Delivering files here:**", "Runtime-local paths are never deliverables", "load the `multica-platform` skill"} {
+				if !strings.Contains(brief, kept) {
+					t.Errorf("%s/%s: lost delivery contract or skill entry: %q", kind, provider, kept)
+				}
+			}
+		}
+	}
+}
+
 // availableCommandsSection cuts `## Available Commands` out of a brief by its
 // line-start heading, so a phrase that also appears in another section (the
 // Comment Formatting rules, the Repositories checkout note) cannot satisfy an
@@ -81,17 +101,9 @@ func TestAvailableCommandsKeepsCompressedContracts(t *testing.T) {
 					"a clean, fully pushed checkout on another branch starts over on a new branch",
 					"`--fresh` discards uncommitted and untracked files",
 					"push any you still need first",
-					// Git identity: the scoped override and the two prohibitions.
-					"keep it unless asked",
-					"`git config --worktree user.name` / `user.email`",
-					"plain or `--local` config can leak into a shared cache",
-					"never change the global identity",
-					// Stash: the list is shared across checkouts (MUL-8989), so
-					// the prohibition and both safe alternatives stay here.
+					// The destructive shared-list warning stays before Git operations.
 					"share a single `git stash` list",
 					"never use `git stash` / `git stash pop` there",
-					"make a temporary commit",
-					"keep the SHA from `git stash create` and restore it with `git stash apply <sha>`",
 				} {
 					if !strings.Contains(ac, want) {
 						t.Errorf("Available Commands lost %q\n---\n%s", want, ac)

@@ -1,6 +1,7 @@
 package execenv
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -279,27 +280,14 @@ func writeAvailableCommands(b *strings.Builder, ctx TaskContextForEnv) {
 	b.WriteString("- `multica issue children <id> [--output json]` — list a parent's sub-issues grouped by stage.\n")
 	b.WriteString("- `multica issue comment add <issue-id> [--content \"...\" | --content-file <path> | --content-stdin] [--parent <comment-id>] [--attachment <path>]` — post a comment. Agent-authored bodies MUST use `--content-file` with a file inside your working directory; full flags: `multica issue comment add --help`.\n")
 	b.WriteString("- `multica repo checkout <url> [--ref <branch-or-sha>] [--fresh]` — repository checkout on a dedicated branch; re-running it keeps a checkout that has uncommitted or unpushed work, or is already on this task's branch, and only fetches; a clean, fully pushed checkout on another branch starts over on a new branch. `--fresh` discards uncommitted and untracked files for a new branch; commits stay on the old branch, so push any you still need first.\n\n")
-	b.WriteString("Commits use the user's configured Git identity; keep it unless asked. For a requested override in a managed checkout use `git config --worktree user.name` / `user.email` — plain or `--local` config can leak into a shared cache; never change the global identity.\n\n")
 	// refs/stash belongs to the shared repository cache, not to a worktree, so
 	// every agent checkout of one repo pushes and pops the same list (MUL-8989:
 	// a `git stash pop` applied another agent's edits).
 	b.WriteString(sharedStashRule)
-	// Squad maintenance is squad-leader surface: an agent that leads no squad
-	// has no squad to change roles in, so this shipped to every run as dead
-	// weight (MUL-5442). IsSquadLeader is a PER-TASK role (the daemon derives
-	// it from the claim's is_leader_task / squad_id), so gating brief content
-	// on it does cost byte-stability across runs of one session whenever the
-	// role flips. That is an owner-accepted tradeoff, not an open action item;
-	// the decision is recorded in MUL-5811.
-	if ctx.IsSquadLeader {
-		b.WriteString("### Squad maintenance\n")
-		b.WriteString("- `multica squad member set-role <squad-id> --member-id <id> --member-type <agent|member> --role <role> [--output json]` — change role in place (use this instead of remove+add).\n\n")
-	}
 }
 
-// sharedStashRule keeps agents off the stash list in managed checkouts and
-// names the two ways to set changes aside that stay inside one checkout.
-const sharedStashRule = "Managed checkouts of one repo share a single `git stash` list, so `git stash pop` can apply another agent's changes: never use `git stash` / `git stash pop` there. To set changes aside, make a temporary commit, or keep the SHA from `git stash create` and restore it with `git stash apply <sha>`.\n\n"
+// sharedStashRule keeps the destructive shared-list warning at the call site.
+const sharedStashRule = "Managed checkouts of one repo share a single `git stash` list, so `git stash pop` can apply another agent's changes: never use `git stash` / `git stash pop` there.\n\n"
 
 // duplicateOfCommandLine teaches the duplicate mark (MUL-7821). Without it
 // agents cancel duplicates with a plain status change plus a comment, which
@@ -437,17 +425,38 @@ func writeCommentFormatting(b *strings.Builder) {
 	b.WriteString(commentReceiptRule)
 }
 
-// writeRepositories emits the Repositories section when at least one repo
-// is configured. The closing paragraph from the legacy version is dropped
-// (it re-stated the opening); intro is tightened into one line.
+// projectListsRepo identifies URL-only rows already rendered by Project Context.
+func projectListsRepo(ctx TaskContextForEnv, url string) bool {
+	for _, resource := range ctx.ProjectResources {
+		if resource.ResourceType != "github_repo" {
+			continue
+		}
+		var ref struct {
+			URL string `json:"url"`
+		}
+		if json.Unmarshal(resource.ResourceRef, &ref) == nil && ref.URL == url {
+			return true
+		}
+	}
+	return false
+}
+
+// writeRepositories preserves workspace-only repos and checkout-specific metadata.
 func writeRepositories(b *strings.Builder, ctx TaskContextForEnv) {
-	if len(ctx.Repos) == 0 {
+	repos := make([]RepoContextForEnv, 0, len(ctx.Repos))
+	for _, repo := range ctx.Repos {
+		if repo.Ref == "" && repo.Description == "" && projectListsRepo(ctx, repo.URL) {
+			continue
+		}
+		repos = append(repos, repo)
+	}
+	if len(repos) == 0 {
 		return
 	}
 	b.WriteString("## Repositories\n\n")
 	b.WriteString("Available in this workspace — `multica repo checkout <url> [--ref <branch-or-sha>]` to fetch (creates a repository checkout on a dedicated branch).\n\n")
 	pinned := false
-	for _, repo := range ctx.Repos {
+	for _, repo := range repos {
 		line := "- " + repo.URL
 		if repo.Description != "" {
 			line += " — " + repo.Description
@@ -718,19 +727,9 @@ func writeIssueStatusRulesForWorkflow(b *strings.Builder, ctx TaskContextForEnv)
 	b.WriteString("- Your turn produced none of the issue's own deliverable — you answered a question or consulted on work owned elsewhere → write nothing, at any point; questions, discussion, and acknowledgements never touch status. This no-write default is what keeps concurrent runs from flapping the board.\n\n")
 }
 
-// writeSubIssueCreation emits the Sub-issue Creation section.
-//
-// MUL-5442 demotes the full todo/backlog/stage playbook to the multica-platform
-// built-in skill: the semantics are only needed at the moment an agent is about
-// to create sub-issues, and that moment is exactly what triggers the skill. The
-// brief keeps the one-line map so the flags remain discoverable without it.
-//
-// The when-to-split rule stays in the brief rather than the skill: agents split
-// work without ever reaching for the skill, so a rule that only lives there is
-// read too late (MUL-8441).
+// writeSubIssueCreation keeps trigger side effects and routes planning to the skill.
 func writeSubIssueCreation(b *strings.Builder, ctx TaskContextForEnv) {
 	b.WriteString("## Sub-issue Creation\n\n")
-	b.WriteString("Default to one issue, one PR. Split only when each piece can be merged and verified on its own — another repository, separate code, or a different owner such as a human step or another agent — and slice by user-visible behavior, never by layer: a backend / frontend split of one feature loses the discussion behind it and cannot be verified end to end until every piece lands. A PR that is large to review is not a reason to split; organize it into commits and give reviewers a guide in its description.\n\n")
 	b.WriteString("`--status todo` starts an agent-assigned child immediately; `--status backlog` parks it for later promotion; `--stage <N>` groups children into ordered stages.")
 	if where, ok := subIssueContractsSkill(modelVisibleSkills(ctx.AgentSkills)); ok {
 		b.WriteString(" Before creating sub-issues, read " + where + " — it covers when to split, serial chains, promotion, and stage wake semantics.")
@@ -892,21 +891,6 @@ func writeDeliveryInvariant(b *strings.Builder) {
 	b.WriteString("**Runtime-local paths are never deliverables.** Your working directory exists only on the machine running you — NEVER write an absolute path or a `file://` URL as a clickable link or an embedded image. Reference code locations as inline code, never a link: `path/to/file.ts:42`. Deliver files through this surface's mechanism (above); if it has none, say so in words — never link the path and imply the file was delivered.\n\n")
 }
 
-// writeInlineBlocksPolicy tells a surface that renders the reply as rich text
-// where a chart or diagram goes (MUL-7649). A fenced `html` / `mermaid` block
-// renders in place as a dynamic block; an attachment, HTML included, is a file
-// and shows as a card. Agents that uploaded report.html expecting an inline
-// chart now get a card, and the platform skill's reference is only opened on
-// demand, so the one-line rule sits here, beside the file-delivery line, where
-// it is in front of the agent when it writes the reply. The detail (theme
-// variables, sizing) stays in the reference.
-//
-// Only surfaces the web renders get it: channel chats, autopilot run results
-// and quick-create stdout do not render these blocks.
-func writeInlineBlocksPolicy(b *strings.Builder) {
-	b.WriteString("\n**Charts and diagrams:** put them in the text as a fenced `html` or `mermaid` code block — it renders in place (name it with `title=\"...\"` after the language). An attached file, HTML included, shows as a card instead. Theming and sizing: the multica-platform issues reference.\n")
-}
-
 // writeOutput emits the kind-specific Output section: the always-on delivery
 // invariant plus one per-surface file-delivery policy line per kind.
 func writeOutput(b *strings.Builder, kind taskKind, ctx TaskContextForEnv) {
@@ -944,7 +928,6 @@ func writeOutput(b *strings.Builder, kind taskKind, ctx TaskContextForEnv) {
 			fmt.Fprintf(b, "**Delivering files here:** whether Multica can push a file you produce into this %s conversation depends on how this deployment is configured, so it is stated per turn rather than here: the per-turn user message tells you, every turn. Follow what it says about files, and never report a file as delivered unless it told you how to deliver one.\n", ChannelDisplayName(ctx.ChatChannelType))
 		} else {
 			b.WriteString("**Delivering files here:** run `multica attachment upload <local-path>` — it binds the file to your reply and it renders as an attachment card. That command is the ONLY way a file reaches the user; a path written into your reply text is not.\n")
-			writeInlineBlocksPolicy(b)
 		}
 	default:
 		if ctx.IsSquadLeader {
@@ -953,9 +936,7 @@ func writeOutput(b *strings.Builder, kind taskKind, ctx TaskContextForEnv) {
 			b.WriteString("⚠️ **Final results MUST be delivered via `multica issue comment add`.** The user does NOT see your terminal output or run logs — only comments on the issue.\n\n")
 		}
 		b.WriteString("**Post only your final result, before this turn exits — one comment, or one reply per thread when the per-turn message lists several threads.** Do NOT post progress updates or plans along the way. Only a scheduled wakeup check whose `[WAKEUP]` block offers `multica issue wakeup checkin` may check in instead of commenting, when it found nothing that needs a reply.\n\n")
-		b.WriteString("Keep comments concise and natural — state the outcome, not the process.\n\n")
 		b.WriteString("**Delivering files here:** pass `--attachment <path>` to `multica issue comment add` (repeatable) — the only way a screenshot or artifact reaches the reader.\n")
-		writeInlineBlocksPolicy(b)
 	}
 	b.WriteString("\n")
 	writeDeliveryInvariant(b)

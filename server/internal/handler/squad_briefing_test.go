@@ -65,6 +65,44 @@ func TestSquadOperatingProtocolScopesParentStatusOwnership(t *testing.T) {
 	}
 }
 
+func TestSquadOperatingProtocolLeavesDelegationDetailToCommentPolicy(t *testing.T) {
+	for _, ownsIssueStatus := range []bool{false, true} {
+		for _, workflow := range []leaderWorkflow{leaderNoWorkflow, leaderWorkflowCurrentDaemon, leaderWorkflowLegacyDaemon, leaderWorkflowStepMoved} {
+			protocol := squadOperatingProtocolFor(ownsIssueStatus, workflow)
+			compact := strings.Join(strings.Fields(protocol), " ")
+			for _, forbidden := range []string{
+				"Be terse",
+				"already has full context",
+				"Do NOT restate",
+				"Say only what cannot be inferred",
+				"Two or three sentences",
+				"Repeating context is noise",
+			} {
+				if strings.Contains(compact, forbidden) {
+					t.Errorf("ownsIssueStatus=%v workflow=%v: competing comment policy %q remains", ownsIssueStatus, workflow, forbidden)
+				}
+			}
+			for _, want := range []string{
+				"## Squad Operating Protocol",
+				"Match the task to each member's listed **skills** and role",
+				"Use the exact mention markdown shown in the Squad Roster",
+				"[@Name](mention://<type>/<UUID>)",
+				"Record your evaluation",
+				"Stop after dispatching",
+				"record `no_action` and exit silently",
+				"holds only while the call succeeds",
+				"never post a second comment",
+				"Do NOT @mention members who don't appear in the Squad Roster",
+				"Never both for the same work.",
+			} {
+				if !strings.Contains(compact, want) {
+					t.Errorf("ownsIssueStatus=%v workflow=%v: safety instruction %q missing", ownsIssueStatus, workflow, want)
+				}
+			}
+		}
+	}
+}
+
 // seedSquadForBriefing creates a squad with the seeded test agent as
 // leader. Returns the loaded db.Squad and a cleanup-registered ID.
 func seedSquadForBriefing(t *testing.T, leaderID string, name, instructions string) db.Squad {

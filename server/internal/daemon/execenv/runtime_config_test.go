@@ -2409,28 +2409,17 @@ func TestBriefSkillsListIsNamesOnly(t *testing.T) {
 	}
 }
 
-// TestBriefCarriesTheWhenToSplitRule pins the two halves of MUL-8441 that live
-// in the cached brief: the default against splitting a feature into sub-issues,
-// and the step-1 hook that makes reading a sub-issue's parent part of reading
-// the issue. Both must hold without the platform skill installed.
-func TestBriefCarriesTheWhenToSplitRule(t *testing.T) {
+// Platform triggers stay discoverable without imposing a team's work decomposition.
+func TestBriefKeepsSubIssueEffectsWithoutEngineeringPolicy(t *testing.T) {
 	t.Parallel()
-
 	out := buildMetaSkillContent("claude", TaskContextForEnv{IssueID: "issue-1"})
-	for _, want := range []string{
-		"Default to one issue, one PR.",
-		"slice by user-visible behavior, never by layer",
-		"A PR that is large to review is not a reason to split",
-		"When the per-turn message carries a `[Parent issue]` block, this issue is a sub-issue",
-	} {
+	for _, want := range []string{"`--status todo` starts an agent-assigned child immediately", "When the per-turn message carries a `[Parent issue]` block"} {
 		if !strings.Contains(out, want) {
-			t.Errorf("brief lost %q:\n%s", want, out)
+			t.Errorf("brief lost %q", want)
 		}
 	}
-	rule := strings.Index(out, "Default to one issue, one PR.")
-	flags := strings.Index(out, "`--status todo` starts an agent-assigned child immediately")
-	if rule < 0 || flags < 0 || rule > flags {
-		t.Errorf("the split rule must come before the sub-issue flags it gates:\n%s", out)
+	if strings.Contains(out, "Default to one issue, one PR") {
+		t.Error("brief must not impose an engineering decomposition policy")
 	}
 }
 
@@ -2630,5 +2619,37 @@ func TestEveryBriefThatTeachesJSONOutputAlsoWarnsAgainstMergingStderr(t *testing
 		if !strings.Contains(brief, wantWhy) {
 			t.Errorf("%s brief states %q without %q; a rule with no reason is the first one dropped under pressure", name, wantRule, wantWhy)
 		}
+	}
+}
+
+func TestBriefDeduplicatesProjectRepoWithoutLosingCheckoutMetadata(t *testing.T) {
+	t.Parallel()
+	const url = "https://example.test/repo.git"
+	for _, tc := range []struct {
+		name, ref, description string
+		count                  int
+	}{
+		{"URL only", "", "", 1}, {"pinned", "release", "", 2}, {"description", "", "workspace-only context", 2},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := TaskContextForEnv{IssueID: "issue-1", ProjectID: "project-1",
+				Repos:            []RepoContextForEnv{{URL: url, Ref: tc.ref, Description: tc.description}},
+				ProjectResources: []ProjectResourceForEnv{{ResourceType: "github_repo", ResourceRef: []byte(`{"url":"https://example.test/repo.git"}`)}},
+			}
+			out := buildMetaSkillContent("claude", ctx)
+			if got := strings.Count(out, url); got != tc.count {
+				t.Errorf("URL occurrences = %d, want %d", got, tc.count)
+			}
+			if tc.ref != "" && !strings.Contains(out, "starts from `release`") {
+				t.Error("lost checkout ref")
+			}
+			if tc.description != "" && !strings.Contains(out, tc.description) {
+				t.Error("lost workspace description")
+			}
+			ctx.ProjectResources = nil
+			if !strings.Contains(buildMetaSkillContent("claude", ctx), url) {
+				t.Error("lost workspace-only repository")
+			}
+		})
 	}
 }

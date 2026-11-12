@@ -2708,8 +2708,9 @@ func runIssueCommentAdd(cmd *cobra.Command, args []string) error {
 	var attachmentIDs []string
 	uploaded := make([]cli.AttachmentResponse, 0, len(pending))
 	for _, att := range pending {
-		// Comment attachments are linked by the comment request; upload them unbound first.
-		result, uploadErr := client.UploadIssueAttachment(ctx, att.data, att.path, "")
+		// Bind uploads to the issue for servers that cannot adopt ownerless comment attachments.
+		// If posting fails, the upload remains an issue attachment.
+		result, uploadErr := client.UploadIssueAttachment(ctx, att.data, att.path, issueID)
 		if uploadErr != nil {
 			return fmt.Errorf("upload attachment %s: %w", att.path, uploadErr)
 		}

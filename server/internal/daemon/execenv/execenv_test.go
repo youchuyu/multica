@@ -1445,13 +1445,8 @@ func TestInjectRuntimeConfigAvailableCommandsCoreOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read leader AGENTS.md: %v", err)
 	}
-	for _, want := range []string{
-		"### Squad maintenance",
-		"multica squad member set-role <squad-id>",
-	} {
-		if !strings.Contains(string(leader), want) {
-			t.Errorf("squad-leader AGENTS.md missing %q\n---\n%s", want, leader)
-		}
+	if strings.Contains(string(leader), "multica squad member set-role") {
+		t.Error("maintenance recipes belong in the platform skill, not every leader brief")
 	}
 
 	for _, banned := range []string{

@@ -103,6 +103,13 @@ absent, you are not in the normal agent checkout path. When a project
 ref by default for the current task; an explicit
 `repo checkout <url> --ref <branch-or-sha>` overrides it.
 
+Commits use the user's configured Git identity; keep it unless asked. For an
+explicit override in a managed checkout, use `git config --worktree user.name`
+and `user.email`; plain `--local` config can affect a shared cache. Never change
+the global identity. Managed worktrees share their stash list. To set changes
+aside without consuming another task's stash, make a temporary commit, or keep
+the SHA from `git stash create` and restore it with `git stash apply <sha>`.
+
 ## Task CLI boundary
 
 The daemon injects a task-scoped `mat_` credential for Multica API commands and
