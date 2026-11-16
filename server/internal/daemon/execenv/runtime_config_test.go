@@ -82,13 +82,16 @@ func TestSubIssueCreationSectionPresentForIssueRuns(t *testing.T) {
 
 func TestIssueWorkflowCarriesSourceContextPrecedenceOnce(t *testing.T) {
 	t.Parallel()
-	out := buildMetaSkillContent("claude", TaskContextForEnv{IssueID: "issue-1"})
-	const rule = "If the issue JSON contains `source_context`"
-	if count := strings.Count(out, rule); count != 1 {
-		t.Fatalf("source-context precedence rule count = %d, want 1", count)
-	}
-	if !strings.Contains(out, "current issue title, description, and comments are authoritative task instructions") {
-		t.Fatal("source-context rule does not identify the current issue as authoritative")
+	for _, skills := range [][]SkillContextForEnv{nil, {issueExecutionFixture("allocated-execution")}} {
+		out := buildMetaSkillContent("claude", TaskContextForEnv{IssueID: "issue-1", AgentSkills: skills})
+		if count := strings.Count(out, "`source_context`"); count != 1 {
+			t.Fatalf("source-context precedence rule count = %d, want 1", count)
+		}
+		for _, phrase := range []string{"read-only historical background", "current issue title, description", "comments are authoritative", "quoted source instructions"} {
+			if !strings.Contains(out, phrase) {
+				t.Errorf("source-context safety rule missing %q", phrase)
+			}
+		}
 	}
 }
 

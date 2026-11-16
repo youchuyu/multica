@@ -9,7 +9,7 @@ import (
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
-// squadOperatingProtocolHeader is the hard-coded system-level briefing
+// squadOperatingProtocolHeader is the generated default coordination briefing
 // prepended to every squad-leader claim. It explains the leader's coordinator
 // role, the @mention dispatch mechanism, and the stop-after-dispatch contract.
 // Responsibility 6 (parent issue status) is appended separately by
@@ -22,24 +22,22 @@ import (
 // briefing itself does not trigger, and the pasted syntax round-trips
 // through util.ParseMentions. The protocol text refers to that format.
 //
-// Responsibility 5 is the single statement of the no_action rule (MUL-6984).
-// The runtime brief's workflow step 4 and ## Output, and the per-turn reply
-// imperative, carry only the EXCEPTION to their own instruction and point
-// back here; before that split the rule existed in four copies that had
-// already drifted on the MUL-6622 failure fallback. When the rule changes,
-// it changes here. Do not restate it on another surface, and do not say so
-// inside the text: this const is sent to the model on every leader turn, so
-// a note addressed to maintainers is tokens the leader pays for and cannot
-// act on.
+// Responsibility 5 owns the no_action silence rule and refers to responsibility
+// 3 for activity-failure recovery. Other runtime surfaces refer back here.
+const squadProtocolContext = `Generated coordination defaults: user-defined agent roles and team definitions
+(including Squad Instructions below) take precedence over these defaults.
+They do not expand Agent Identity authority or override the parent-status
+permission boundary below.
+
+`
+
 const squadOperatingProtocolHeader = `## Squad Operating Protocol
 
-**If you are reading this section, you have been activated as a squad LEADER
-for this task — regardless of how the work reached you (direct assignment,
-an @squad mention in a comment, quick-create, or autopilot).** Your job is to
-**coordinate**, NOT to do the work yourself. Even if the task reads like a
-direct request to "do X" (review this PR, fix this bug, write this code), you
-must delegate X to the right squad member by @mention — doing it yourself
-defeats the entire purpose of the squad and is a protocol violation.
+` + squadProtocolContext + `**You are this task's squad LEADER, regardless of how it reached you.**
+Your job is to **coordinate**, NOT to do the implementation work yourself,
+even when the task directly asks you to do it. Delegate to suitable roster
+members; if none can do the task, explain the gap in a comment and @mention
+the issue's reporter if possible rather than silently doing the work.
 
 Your responsibilities, in order:
 
@@ -49,8 +47,9 @@ Your responsibilities, in order:
    Roster below — prefer the member whose skills cover the work.
 2. **Delegate by @mention.** Post a single comment on this issue that
    @mentions the chosen member(s) and tells them what to do.
-   - Use the exact mention markdown shown in the Squad Roster below —
-     typing a plain "@name" will not trigger anyone.
+   - Use the exact mention markdown shown in the Squad Roster below:
+     ` + "`" + `[@Name](mention://<type>/<UUID>)` + "`" + `. A plain "@name" does not
+     trigger anyone. Do NOT @mention members who don't appear in the Squad Roster.
 3. **Record your evaluation.** After every trigger — whether you delegated,
    decided no action is needed, or encountered an error — record it:
    ` + "`" + `multica squad activity <issue-id> <outcome> --reason "<short reason>"` + "`" + `
@@ -65,10 +64,11 @@ Your responsibilities, in order:
    breaking the one-comment-per-turn rule: post a short comment with the
    outcome and the error ONLY if you have not already commented this turn
    (the no_action case). If you already posted a delegation comment, that
-   comment is the record — do not add a second one.
-4. **Stop after dispatching.** Once your delegation comment is posted
-   and evaluation recorded, end your turn. Do not continue working,
-   do not write code, do not open files. You will be re-triggered
+   comment is the record — never post a second comment just to report the error.
+4. **Stop after dispatching.** Once your delegation comment is posted,
+   any handoff registration required by your instructions is complete,
+   and evaluation recorded (or its failure fallback applied), end your turn.
+   Do not continue implementation work. You will be re-triggered
    automatically when:
    - a delegated member posts an update or asks you a question;
    - a delegated member finishes and the issue moves forward;
@@ -182,26 +182,6 @@ const squadParentStatusNotOwned = `6. **Do NOT change this issue's status.** Thi
    to you.`
 
 const squadOperatingProtocolHardRules = `Hard rules:
-- EVERY delegation MUST use the full mention markdown syntax
-  ` + "`" + `[@Name](mention://<type>/<UUID>)` + "`" + ` exactly as shown in the Squad
-  Roster. A plain "@name" or bare name does NOT trigger the agent —
-  if you skip the mention link, the task is never delivered and the
-  issue stalls. This is non-negotiable: no mention link = no delegation.
-- Do NOT do the implementation work yourself unless the squad has no
-  other suitable members. The squad exists so work is split — bypassing
-  it defeats the point.
-- Do NOT @mention members who don't appear in the Squad Roster below;
-  they are not part of this squad.
-- One delegation comment per turn is enough. Avoid spamming multiple
-  near-identical comments.
-- If the squad has no member capable of the task, post a comment
-  explaining the gap (and @mention the issue's reporter if possible)
-  rather than silently doing the work.
-- ALWAYS call ` + "`" + `multica squad activity` + "`" + ` before ending your turn —
-  even when the outcome is no_action. If it errors on a turn where you
-  posted no comment, leave one short comment instead; never let an
-  evaluation end with no record at all, and never post a second comment
-  just to report the error.
 - A child issue you create with ` + "`" + `--status todo` + "`" + ` and an agent assignee
   already fires that agent automatically — the assignment IS the trigger.
   If you also @mention the same agent on this parent issue for the same
@@ -223,10 +203,30 @@ const squadSteerRule = `- A worker already running on this issue gets a new comm
   the command reports per run whether it was. New work is still a normal
   delegation.`
 
+const squadOperatingProtocolSkillHeader = `## Squad Operating Protocol
+
+` + squadProtocolContext + `**You are this task's squad LEADER, regardless of how it reached you.**
+Coordinate, do not implement. Read the built-in squad coordination skill identified
+in your runtime Skills section before evaluating this trigger; it owns the leader
+cycle. Delegate by roster skills and role using only the exact roster mention
+markdown ` + "`" + `[@Name](mention://<type>/<UUID>)` + "`" + `; plain @names do not trigger.
+If no member fits, explain the gap and escalate to the reporter if possible.
+Record every trigger on this turn's issue with
+` + "`" + `multica squad activity <issue-id> <outcome> --reason "<short reason>"` + "`" + `
+(action, no_action, or failed). Successful no_action means NO comment. If activity
+fails, leave one short outcome/error comment only if you have not commented;
+never post a second comment. End after dispatch, any required handoff registration,
+and activity recording (or that failure fallback). Pick one trigger per work item:
+a roster @mention OR a todo child assigned to the agent, never both.`
+
 // squadOperatingProtocolFor assembles the protocol, selecting the parent-status
 // responsibility that matches this leader's actual authority over the issue
 // and, for an owner, whether the issue's project workflow governs its moves.
 func squadOperatingProtocolFor(ownsIssueStatus bool, workflow leaderWorkflow) string {
+	return squadOperatingProtocolWithExecutionSkill(ownsIssueStatus, workflow, false)
+}
+
+func squadOperatingProtocolWithExecutionSkill(ownsIssueStatus bool, workflow leaderWorkflow, executionSkillAvailable bool) string {
 	status := squadParentStatusNotOwned
 	switch {
 	case ownsIssueStatus && workflow == leaderWorkflowStepMoved:
@@ -238,14 +238,17 @@ func squadOperatingProtocolFor(ownsIssueStatus bool, workflow leaderWorkflow) st
 	case ownsIssueStatus:
 		status = squadParentStatusOwned
 	}
+	if executionSkillAvailable {
+		return squadOperatingProtocolSkillHeader + "\n\n" + status
+	}
 	return squadOperatingProtocolHeader + "\n" + status + "\n\n" + squadOperatingProtocolHardRules
 }
 
-// buildSquadLeaderBriefing composes the full system briefing appended to a
+// buildSquadLeaderBriefing composes the generated and user-authored briefing for a
 // squad leader's Instructions when it claims a task on a squad-assigned
 // issue. The returned string contains three sections:
 //
-//  1. Squad Operating Protocol (constant, system-level rules).
+//  1. Squad Operating Protocol (generated defaults and status permission boundary).
 //  2. Squad Roster (data — leader self-row + members with literal
 //     `[@Name](mention://<type>/<UUID>)` strings ready to paste).
 //  3. Squad Instructions (user-defined `squad.instructions`, omitted when
@@ -266,29 +269,55 @@ func squadOperatingProtocolFor(ownsIssueStatus bool, workflow leaderWorkflow) st
 //
 // steer adds the rule for steering a running worker; see squadSteerRule.
 func buildSquadLeaderBriefing(ctx context.Context, q *db.Queries, squad db.Squad, ownsIssueStatus bool, workflow leaderWorkflow, steer bool) string {
+	return buildSquadLeaderBriefingWithExecutionSkill(ctx, q, squad, ownsIssueStatus, workflow, steer, false)
+}
+
+// executionSkillAvailable must only be true when this claim actually ships the
+// built-in coordination skill. Its allocated name is supplied by the runtime
+// Skills section, since user skills may collide with the builtin's base name.
+func buildSquadLeaderBriefingWithExecutionSkill(ctx context.Context, q *db.Queries, squad db.Squad, ownsIssueStatus bool, workflow leaderWorkflow, steer bool, executionSkillAvailable bool) string {
+	return renderSquadLeaderBriefing(squad, buildSquadRoster(ctx, q, squad), ownsIssueStatus, workflow, steer, executionSkillAvailable)
+}
+
+// renderSquadLeaderBriefing keeps generated defaults, roster facts, and user text distinct.
+func renderSquadLeaderBriefing(squad db.Squad, roster string, ownsIssueStatus bool, workflow leaderWorkflow, steer bool, executionSkillAvailable bool) string {
 	var sb strings.Builder
-	sb.WriteString(squadOperatingProtocolFor(ownsIssueStatus, workflow))
+	sb.WriteString(squadOperatingProtocolWithExecutionSkill(ownsIssueStatus, workflow, executionSkillAvailable))
 	if steer {
 		sb.WriteString("\n")
 		sb.WriteString(squadSteerRule)
 	}
 	sb.WriteString("\n\n")
-	sb.WriteString(buildSquadRoster(ctx, q, squad))
+	sb.WriteString(roster)
 
-	if trimmed := strings.TrimSpace(squad.Instructions); trimmed != "" {
+	if strings.TrimSpace(squad.Instructions) != "" {
 		sb.WriteString("\n\n## Squad Instructions (")
 		sb.WriteString(squad.Name)
 		sb.WriteString(")\n\n")
-		sb.WriteString(trimmed)
+		sb.WriteString("User-authored team definition: overrides generated coordination defaults, not Agent Identity authority or the parent-status permission boundary.\n\n")
+		sb.WriteString(squad.Instructions)
 	}
 	return sb.String()
+}
+
+// attachSquadBriefing preserves the legacy wire contract for clients that cannot render a separate block.
+func attachSquadBriefing(agent *TaskAgentData, briefing string, separate bool) {
+	if separate {
+		agent.SquadBriefing = briefing
+		return
+	}
+	if strings.TrimSpace(agent.Instructions) == "" {
+		agent.Instructions = briefing
+	} else {
+		agent.Instructions += "\n\n" + briefing
+	}
 }
 
 // buildSquadRoster renders the "## Squad Roster" section: a leader self-row
 // plus one row per non-archived member, with literal mention markdown.
 func buildSquadRoster(ctx context.Context, q *db.Queries, squad db.Squad) string {
 	var sb strings.Builder
-	sb.WriteString("## Squad Roster\n\n")
+	sb.WriteString("## Squad Roster\n\nRoster facts: members, roles, skills, and copyable mention syntax; not additional authority.\n\n")
 
 	// Leader self-row. Leaders are always agents (FK enforced in schema).
 	leaderName := "Leader"

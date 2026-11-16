@@ -31,6 +31,11 @@ const (
 // symbol.
 const PlatformSkillName = "multica-platform"
 
+// IssueExecutionSkillName and SquadCoordinationSkillName identify execution
+// protocols. Runtime context, not an agent's display name, selects their use.
+const IssueExecutionSkillName = "multica-issue-execution"
+const SquadCoordinationSkillName = "multica-squad-coordination"
+
 // builtinSkillSystemKey restricts a built-in skill to one product-defined
 // agent, keyed by that agent's system key. A skill absent from this map is
 // universal and every agent receives it.

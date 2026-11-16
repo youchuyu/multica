@@ -210,6 +210,8 @@ func daemonCommonCapabilities() []string {
 		protocol.DaemonCapabilitySourceContextQuickCreateV1,
 		protocol.DaemonCapabilityRPCV1,
 		protocol.DaemonCapabilityPlatformSkillV1,
+		protocol.DaemonCapabilityExecutionSkillsV1,
+		protocol.DaemonCapabilitySquadBriefingV1,
 		protocol.DaemonCapabilityCheckoutKeepsWorkV1,
 		protocol.DaemonCapabilityJoinedWakeupsV1,
 		protocol.DaemonCapabilityWorkflowStatusRulesV1,

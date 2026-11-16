@@ -309,7 +309,7 @@ func TestInjectRuntimeConfigWindowsAssignmentBriefStaysFileOnly(t *testing.T) {
 				"On Windows, **always write the comment body to a UTF-8 file",
 				"do NOT pipe via `--content-stdin`",
 				"use `--output table` to confirm success without echoing the body",
-				"Use `--output json` instead when you need the returned comment ID, attachment details, or other response fields",
+				"use `--output json` for comment IDs or attachment receipts",
 				"Gate the cleanup on the post succeeding",
 				"empty stdout alone does not prove success",
 			} {

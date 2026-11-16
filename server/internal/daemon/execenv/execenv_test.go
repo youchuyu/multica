@@ -5572,12 +5572,11 @@ func TestBuildMetaSkillContentEmitsRequestingUser(t *testing.T) {
 		}
 	}
 
-	// Section must sit between agent identity and available commands so
-	// the agent reads "who am I" → "who is asking" → "what can I do".
+	// Platform context and commands precede the final agent definition.
 	identityIdx := strings.Index(content, "## Agent Identity")
 	requestingIdx := strings.Index(content, "## Requesting User")
 	commandsIdx := strings.Index(content, "## Available Commands")
-	if !(identityIdx >= 0 && identityIdx < requestingIdx && requestingIdx < commandsIdx) {
+	if !(requestingIdx >= 0 && requestingIdx < commandsIdx && commandsIdx < identityIdx) {
 		t.Errorf("section order wrong: identity=%d requesting=%d commands=%d", identityIdx, requestingIdx, commandsIdx)
 	}
 }
@@ -5948,7 +5947,7 @@ func TestInjectRuntimeConfigAssignmentTriggerScansRootsFirst(t *testing.T) {
 	for _, want := range []string{
 		"scan every thread cheaply (`--roots-only --summary --compact`)",
 		"this is mandatory, not optional",
-		"Skipping this step is the most common cause",
+		"Silence about other threads is not a waiver",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("assignment Workflow regressed mandatory scan-first catch-up, missing %q\n---\n%s", want, s)
@@ -6042,7 +6041,7 @@ func TestInjectRuntimeConfigCatchUpScansRootsFirst(t *testing.T) {
 	// about letting agents skip context and act on stale instructions.
 	for _, want := range []string{
 		"this is mandatory, not optional",
-		"Skipping this step is the most common cause",
+		"Silence about other threads is not a waiver",
 	} {
 		if !strings.Contains(s, want) {
 			t.Errorf("step 3 must stay mandatory, missing %q\n---\n%s", want, s)

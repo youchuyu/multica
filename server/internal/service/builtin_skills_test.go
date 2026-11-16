@@ -415,6 +415,10 @@ func TestPlatformSkillCoversPlatformContracts(t *testing.T) {
 		notWant []string
 	}{
 		{
+			file: "references/issues.md",
+			want: []string{"## Authoring issues and comments", "multica issue create --help", "multica issue update --help", "successfully written UTF-8 file", "this turn's supplied `--parent`", "$LASTEXITCODE", "Empty stdout alone is not success", "Keep failed payloads for diagnosis"},
+		},
+		{
 			file: "SKILL.md",
 			want: []string{
 				// Must-fix from review: "load on demand" is not "load exactly

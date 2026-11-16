@@ -1,16 +1,25 @@
 ---
 name: multica-platform
-description: "Use for Multica platform actions the runtime brief does not fully cover: issue and PR contracts, sub-issues, charts and files in comments, mentions, agents, squads, autopilots, projects, runtimes, local environments, skill import. Not for the product code you are working on."
+description: "Required before any Multica platform action, even routine issue reads, comments, create or assign in chat, quick-create or autopilot. Covers issues, sub-issues, PRs, mentions, agents, squads, projects, runtimes, local environments and skill import. Not for product-code work alone."
 user-invocable: false
 allowed-tools: Bash(multica *), Bash(git *), Bash(gh *)
 ---
 
+<!-- multica-platform-operation-contract-v1 -->
+
 # Operating Multica
 
-Your runtime brief owns the per-turn workflow: which issue you are on, when to
-comment, what status to write. This skill owns the platform contracts behind
-it — what a command actually does, what the server validates, and which writes
-have consequences you cannot take back.
+Your runtime brief and the installed issue-execution protocol own when to read,
+act, deliver and change status. The squad-coordination protocol adds leader-only
+steps. This skill owns platform objects and operations — command behavior,
+validation, delivery mechanics and irreversible side effects — not another copy
+of the task workflow. Neither protocol expands Agent Identity or authorization.
+
+Before any platform action, load this skill and read the relevant references —
+even for routine comments, issue creation or assignment in chat, quick-create or
+autopilot. Familiar commands and ready-to-run runtime examples do not waive this
+gate. Loading a skill does not authorize a write or expand Agent or Squad authority.
+For product-code work alone, do not load platform references.
 
 Read the invariants below, then open the reference(s) your task actually needs
 — usually one, sometimes a few. Do not read them all.
@@ -19,9 +28,9 @@ Read the invariants below, then open the reference(s) your task actually needs
 
 | Open | When the task is about |
 |---|---|
-| `references/issues.md` | Issues: PR linking, reading a linked PR's state, custom properties, status side effects, who else is running, wakeups (events, conditions, timers, check-ins), charts vs attached files in a comment |
+| `references/issues.md` | Issues: core read/create/update/assign/status commands, authoring descriptions and comments, optional fields and delivery receipts, PR linking, reading a linked PR's state, custom properties, status side effects, who else is running, wakeups (events, conditions, timers, check-ins), charts vs attached files in a comment |
 | `references/sub-issues.md` | Sub-issues: whether to split an issue at all, `todo` vs `backlog` children, serial chains, stages and the parent wakeups they drive |
-| `references/mentions.md` | Writing a `mention://` link: which types enqueue a run, which are inert, why one silently did nothing; steering another agent's running turn (`comment add --steer`) |
+| `references/mentions.md` | Writing a `mention://` link: which types enqueue a run or notify humans, which are render-only, why one silently did nothing; steering another agent's running turn (`comment add --steer`) |
 | `references/agents.md` | Creating, copying or debugging an agent definition: fields, secrets, MCP config, skill binding |
 | `references/squads.md` | Squads: leader routing, roster, recording leader activity, why a squad did or did not run |
 | `references/autopilots.md` | Autopilots: schedule / webhook / manual triggers, `create_issue` vs `run_only`, why one did not fire |
@@ -36,8 +45,8 @@ issue, then writing a mention needs `squads.md`, `issues.md` and `mentions.md`,
 and skipping one of those means acting on a contract you have not read.
 
 What is never right is reading all ten because you are not sure. Each
-reference states its own contracts in full and none depends on another, so
-pick by domain and skip the rest.
+reference covers its domain; cross-domain actions still require the relevant
+references, so pick by domain and skip the rest.
 
 ## Invariants
 
@@ -45,7 +54,9 @@ These hold across every reference and are not repeated there.
 
 **Read before you write.** Start with the read-only commands the reference you
 opened names — most domains have a `list` and a `get` that take `--output json`
-and have no side effects. Run those before any mutation. When a command's shape
+and have no side effects. Run the applicable reads before mutation, unless your
+run-specific contract forbids them (quick-create creates exactly once without
+querying an issue). Do not invent an issue id to satisfy a read rule. When a command's shape
 is unclear, `multica <command> --help` beats guessing at flags.
 
 **A name is not an id.** Mention links, assignment, and every `--*-id` flag take

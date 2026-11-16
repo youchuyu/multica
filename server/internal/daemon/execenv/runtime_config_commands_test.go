@@ -26,6 +26,52 @@ func TestBriefLeavesPresentationDetailsToPlatformSkill(t *testing.T) {
 	}
 }
 
+func TestBriefCompressionPreservesRoleAndReadContracts(t *testing.T) {
+	t.Parallel()
+	for kind, base := range availableCommandsKinds {
+		for _, provider := range []string{"claude", "codex"} {
+			for _, skillName := range []string{"", platformSkillName, "platform-allocated"} {
+				ctx := base
+				ctx.AgentName = "Custom coordinator"
+				ctx.AgentInstructions = "Role-specific authorization and acceptance gates stay verbatim."
+				if skillName != "" {
+					skill := platformSkillFixture()
+					skill.Name = skillName
+					ctx.AgentSkills = []SkillContextForEnv{skill}
+				}
+				brief := buildMetaSkillContent(provider, ctx)
+				wants := []string{ctx.AgentInstructions, "assigning to an agent can start a run", "Runtime-local paths are never deliverables"}
+				if !hasPlatformOperationContract(ctx) {
+					wants = append(wants, "multica issue create --help", "multica issue update --help")
+				} else {
+					wants = append(wants, "BEFORE acting", "including routine comments")
+				}
+				for _, want := range wants {
+					if !strings.Contains(brief, want) {
+						t.Errorf("%s/%s/%s missing %q", kind, provider, skillName, want)
+					}
+				}
+				if classifyTask(ctx) == kindIssue {
+					for _, want := range []string{"server checked and no comments arrived since your last run", "server-computed issue-wide delta", "--since <anchor>", "Silence about other threads is not a waiver"} {
+						if !strings.Contains(brief, want) {
+							t.Errorf("%s/%s missing %q", kind, provider, want)
+						}
+					}
+					if skillName != "" && !strings.Contains(brief, "`references/sub-issues.md` in the `"+skillName+"` skill") {
+						t.Errorf("lost allocated skill path: %s", skillName)
+					}
+					if skillName == "" && strings.Contains(brief, "Before creating sub-issues, read") {
+						t.Error("referenced an unavailable skill")
+					}
+				}
+				if strings.Contains(availableCommandsSection(t, brief), "[--priority X]") {
+					t.Error("optional field catalog returned")
+				}
+			}
+		}
+	}
+}
+
 // availableCommandsSection cuts `## Available Commands` out of a brief by its
 // line-start heading, so a phrase that also appears in another section (the
 // Comment Formatting rules, the Repositories checkout note) cannot satisfy an

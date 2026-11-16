@@ -92,18 +92,18 @@ func TestBriefSurfaceDeliveryPolicy(t *testing.T) {
 	}{
 		// Issue surfaces: files ride the comment.
 		"comment": {
-			mustHave: []string{"`--attachment <path>` to `multica issue comment add`", inlineBlocksRule},
-			mustNot:  []string{"multica attachment upload"},
+			mustHave: []string{"`--attachment <path>` to `multica issue comment add`"},
+			mustNot:  []string{"multica attachment upload", inlineBlocksRule},
 		},
 		"assignment": {
-			mustHave: []string{"`--attachment <path>` to `multica issue comment add`", inlineBlocksRule},
-			mustNot:  []string{"multica attachment upload"},
+			mustHave: []string{"`--attachment <path>` to `multica issue comment add`"},
+			mustNot:  []string{"multica attachment upload", inlineBlocksRule},
 		},
 		// Direct chat: the upload binds to the reply and the browser renders a
 		// card, so the file can sit inline where the agent puts it.
 		"chat_direct": {
-			mustHave: []string{"`multica attachment upload <local-path>`", inlineBlocksRule},
-			mustNot:  []string{"text-only", "separate message"},
+			mustHave: []string{"`multica attachment upload <local-path>`"},
+			mustNot:  []string{"text-only", "separate message", inlineBlocksRule},
 		},
 		// A channel-backed chat names its platform, defers the verdict to the
 		// per-turn message, and states neither answer. Both verdicts' old copy

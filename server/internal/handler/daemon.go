@@ -3256,12 +3256,8 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 					ownsIssueStatus := issue.AssigneeType.Valid &&
 						issue.AssigneeType.String == "squad" &&
 						uuidToString(issue.AssigneeID) == uuidToString(squad.ID)
-					briefing := buildSquadLeaderBriefing(r.Context(), h.Queries, squad, ownsIssueStatus, leaderWorkflow, requestHasClientCapability(r, protocol.DaemonCapabilityCLICommentSteerV1))
-					if strings.TrimSpace(resp.Agent.Instructions) == "" {
-						resp.Agent.Instructions = briefing
-					} else {
-						resp.Agent.Instructions = resp.Agent.Instructions + "\n\n" + briefing
-					}
+					briefing := buildSquadLeaderBriefingWithExecutionSkill(r.Context(), h.Queries, squad, ownsIssueStatus, leaderWorkflow, requestHasClientCapability(r, protocol.DaemonCapabilityCLICommentSteerV1), requestHasClientCapability(r, protocol.DaemonCapabilityExecutionSkillsV1) && claimHasBuiltinSkill(resp.Agent, service.SquadCoordinationSkillName))
+					attachSquadBriefing(resp.Agent, briefing, requestHasClientCapability(r, protocol.DaemonCapabilitySquadBriefingV1))
 					injected = true
 					slog.Debug("injected squad leader briefing",
 						"squad_id", uuidToString(squad.ID),
@@ -4087,11 +4083,7 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 						// issue with the squad as assignee, the issue-bound
 						// claim path above grants ownership.
 						briefing := buildSquadLeaderBriefing(r.Context(), h.Queries, squad, false, leaderNoWorkflow, requestHasClientCapability(r, protocol.DaemonCapabilityCLICommentSteerV1))
-						if strings.TrimSpace(resp.Agent.Instructions) == "" {
-							resp.Agent.Instructions = briefing
-						} else {
-							resp.Agent.Instructions = resp.Agent.Instructions + "\n\n" + briefing
-						}
+						attachSquadBriefing(resp.Agent, briefing, requestHasClientCapability(r, protocol.DaemonCapabilitySquadBriefingV1))
 						// Surface the squad identity to the daemon so the
 						// quick-create prompt defaults the new issue's
 						// assignee to the squad, not the leader agent.
@@ -4263,6 +4255,15 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 		resp.InitiatorEmail = originator.Email
 	}
 
+	// Role resolution and quick-create routing are complete before scoping either wire format.
+	if resp.Agent != nil {
+		issueTurn := resp.IssueID != ""
+		leaderTurn := resp.IsLeaderTask || resp.SquadID != ""
+		var removedInline, removedRefs int
+		resp.Agent.Skills, resp.Agent.SkillRefs, removedInline, removedRefs = service.ScopeExecutionSkills(resp.Agent.Skills, resp.Agent.SkillRefs, issueTurn, leaderTurn)
+		builtinSkillCount -= removedInline
+		agentSkillCount -= removedRefs
+	}
 	return resp, deliveredCommentIDs, issueSnapshot, agentSkillCount, builtinSkillCount, nil
 }
 
@@ -7014,4 +7015,22 @@ func (h *Handler) GetTaskGCCheck(w http.ResponseWriter, r *http.Request) {
 		"status":       task.Status,
 		"completed_at": task.CompletedAt.Time,
 	})
+}
+
+// claimHasBuiltinSkill checks shipped identity, never a workspace skill's name.
+func claimHasBuiltinSkill(agent *TaskAgentData, name string) bool {
+	if agent == nil {
+		return false
+	}
+	for _, ref := range agent.SkillRefs {
+		if ref.Source == "builtin" && ref.ID == service.BuiltinSkillID(name) {
+			return true
+		}
+	}
+	for _, skill := range agent.Skills {
+		if skill.Name == name && (skill.Source == "builtin" || skill.ID == "") {
+			return true
+		}
+	}
+	return false
 }

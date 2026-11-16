@@ -2,6 +2,8 @@
 
 Product contracts the runtime brief does not fully encode.
 
+- [Core CLI methods](#core-cli-methods)
+- [Authoring issues and comments](#authoring-issues-and-comments)
 - [PR linking](#pr-linking)
 - [Reading a linked PR's real state](#reading-a-linked-prs-real-state)
 - [Custom properties: typed workflow state](#custom-properties-typed-workflow-state)
@@ -12,6 +14,33 @@ Product contracts the runtime brief does not fully encode.
 - [Incorrect to correct](#incorrect-to-correct)
 
 To attach a local file to an existing issue description, use `multica issue update <id> --attachment <local-path>`. The CLI appends the file's Markdown reference to the end of the description; to replace an image, also use `--description-file` to remove the old reference. Do not put local filesystem paths in the description.
+
+## Core CLI methods
+
+Use the daemon-selected `MULTICA_CLI_PATH` executable, not an older CLI through PATH; `multica` below is shorthand. Check command `--help`; never substitute raw API calls. Run-specific limits still apply: quick-create creates exactly once without issue reads or retries; run-only autopilot uses issues only when instructed.
+
+- Read: `multica issue list --output json`, `multica issue get <id> --output json`.
+- Comments: `multica issue comment list <issue-id> --roots-only --summary --compact --output json`, then `--thread <comment-id> --tail 30`. A supplied `--since <RFC3339>` is bounded; `--recent N` caps threads, not comments. Check `--help` for folding and paging.
+- Create: `multica issue create --title "..." --description-file ./description.md --output json`. Optional fields: `--priority`, `--status`, `--assignee` / `--assignee-id` / `--assignee-picker`, `--parent <issue-id>`, `--stage N`, `--project <project-id>`, `--due-date <YYYY-MM-DD>`, repeatable `--attachment <path>`.
+- Update: `multica issue update <id> --description-file ./description.md`; check its help for supported optional fields.
+- Assign: `multica issue assign <id> (--to <name-or-id> | --to-id <uuid> | --unassign)`; resolve names unambiguously. Assigning an agent can start a run.
+- Status: `multica issue status <id> <status-key>` takes a workflow key, not a lifecycle category. Use the current workflow/runtime valid list; invalid input returns it.
+- Duplicate: `multica issue status <id> cancelled --duplicate-of <original>`; plain cancellation leaves no duplicate link.
+- Children: `multica issue children <id> --output json`.
+- Post: `multica issue comment add <issue-id> --content-file ./reply.md --parent <comment-id> --output table`; repeat `--attachment <path>` for files. Omit parent only for an authorized new root, not a supplied reply thread.
+- Wakeups: `multica issue wakeup <create|list|get|update|disable|trigger|delete|runs|events>`; read the wakeup contract below before choosing event, condition or time rules.
+
+## Authoring issues and comments
+
+An issue title already serves as its H1. By default, do not add a Markdown H1
+(`# ...`) to an issue body or description; start with prose or `##` subheadings.
+Only add an H1 when the user specifically requests one.
+
+Discover optional fields with `multica issue create --help` or `multica issue update --help`: priority, assignee, parent, stage, project, due date and attachments are task-specific, not a required checklist. Use only authorized changes. Pass `--parent ""` to clear a parent; assigning an agent can start a run. Before creating agent-assigned children, read the sub-issue contract routed by this skill.
+
+Write rich descriptions with `--description-file <path>`. Always write agent-authored comments with a file-write tool first, then post with `--content-file <path>`, using a successfully written UTF-8 file inside this run's workdir. Never use inline `--content` for agent-authored comments; never use `/tmp` or shared paths, and treat a failed body-file write as fatal. Do not rely on `\n` escapes. Inline `--description` is only for a short single-line body without code, quotes, backticks or shell substitutions; rich or multiline descriptions require a file. Inline shell text can alter quotes, backticks or substitutions; HEREDOC stdin beside other flags can swallow flags. On Windows, piping through PowerShell 5.1 can replace non-ASCII text through `$OutputEncoding`, so use a UTF-8 file rather than a pipe.
+
+For replies, use this turn's supplied `--parent`, not an earlier run's anchor; multiple supplied threads require separate replies. Request `--output table` for a simple receipt, or `--output json` when you need a comment ID or attachment details. Check the posting exit status before cleaning up the body file: use `&&` in bash/Git Bash or check `$LASTEXITCODE` in PowerShell. Empty stdout alone is not success, and unconditional cleanup can hide a posting failure. Keep failed payloads for diagnosis rather than treating cleanup as delivery.
 
 ## PR linking
 

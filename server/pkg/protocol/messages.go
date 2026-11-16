@@ -46,6 +46,12 @@ const (
 	// nothing extra, so the stub retires itself as daemons update.
 	DaemonCapabilityPlatformSkillV1 = "platform-skill-v1"
 
+	// DaemonCapabilityExecutionSkillsV1 advertises collision-safe execution
+	// skill routing in the runtime brief. Older daemons retain full protocols.
+	DaemonCapabilityExecutionSkillsV1 = "execution-skills-v1"
+	// DaemonCapabilitySquadBriefingV1 keeps the complete squad briefing separate from agent instructions.
+	DaemonCapabilitySquadBriefingV1 = "squad-briefing-v1"
+
 	// DaemonCapabilityCheckoutKeepsWorkV1 advertises that the daemon's
 	// `multica repo checkout` keeps an existing checkout that holds work
 	// (uncommitted changes, untracked files, unpushed commits) instead of

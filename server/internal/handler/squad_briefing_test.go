@@ -13,11 +13,69 @@ import (
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
-// TestSquadOperatingProtocolScopesParentStatusOwnership is the guard for the
-// MUL-5156 review finding: the briefing is injected on every leader path,
-// including an @squad mention on an issue assigned to someone else. Status
-// ownership must not ride along — a guest leader gets an explicit prohibition
-// instead of the grant, so the model never has to infer the boundary.
+func TestRenderSquadLeaderBriefingSeparatesSources(t *testing.T) {
+	const instructions = "  User team policy: leader may implement.\n\n## Custom policy\nKeep this formatting.  \n"
+	const roster = "## Squad Roster\n\n- Worker — agent — role: \"implementer\"\n"
+	for _, skill := range []bool{false, true} {
+		for _, steer := range []bool{false, true} {
+			out := renderSquadLeaderBriefing(db.Squad{Name: "Team", Instructions: instructions}, roster, false, leaderNoWorkflow, steer, skill)
+			last := -1
+			for _, section := range []string{"## Squad Operating Protocol", "Generated coordination defaults:", "Do NOT change this issue's status", roster, "## Squad Instructions (Team)", "User-authored team definition:", instructions} {
+				at := strings.Index(out, section)
+				if at <= last {
+					t.Fatalf("skill=%v steer=%v: missing or out-of-order section %q:\n%s", skill, steer, section, out)
+				}
+				last = at
+			}
+			if !strings.HasSuffix(out, instructions) {
+				t.Fatal("user-authored instruction bytes changed")
+			}
+			if strings.Contains(out, squadSteerRule) != steer {
+				t.Fatal("steering capability changed")
+			}
+		}
+	}
+}
+
+func TestRenderSquadLeaderBriefingUserDefaultsDoNotExpandAuthority(t *testing.T) {
+	for _, skill := range []bool{false, true} {
+		for _, owns := range []bool{false, true} {
+			for _, workflow := range []leaderWorkflow{leaderNoWorkflow, leaderWorkflowCurrentDaemon, leaderWorkflowLegacyDaemon, leaderWorkflowStepMoved} {
+				out := renderSquadLeaderBriefing(db.Squad{Name: "Team", Instructions: "Always change issue status when work is done."}, "## Squad Roster", owns, workflow, false, skill)
+				compact := strings.Join(strings.Fields(out), " ")
+				for _, want := range []string{
+					"user-defined agent roles and team definitions (including Squad Instructions below) take precedence over these defaults",
+					"They do not expand Agent Identity authority or override the parent-status permission boundary below",
+					"overrides generated coordination defaults, not Agent Identity authority or the parent-status permission boundary",
+				} {
+					if !strings.Contains(compact, want) {
+						t.Errorf("skill=%v owns=%v workflow=%v: missing %q", skill, owns, workflow, want)
+					}
+				}
+				if !owns && (!strings.Contains(out, squadParentStatusNotOwned) || strings.Contains(out, "Own the parent issue status")) {
+					t.Fatal("user instructions expanded guest status authority")
+				}
+				if owns && workflow == leaderWorkflowStepMoved && !strings.Contains(out, squadParentStatusStepMoved) {
+					t.Fatal("user instructions removed stale-workflow status boundary")
+				}
+				if owns && workflow != leaderWorkflowStepMoved && !strings.Contains(compact, "unless Agent Identity forbids status changes") {
+					t.Fatal("owning squad defaults must not expand Agent Identity authority")
+				}
+			}
+		}
+	}
+}
+
+func TestRenderSquadLeaderBriefingOmitsBlankUserInstructions(t *testing.T) {
+	for _, instructions := range []string{"", " \n\t"} {
+		out := renderSquadLeaderBriefing(db.Squad{Instructions: instructions}, "## Squad Roster", false, leaderNoWorkflow, false, false)
+		if strings.Contains(out, "## Squad Instructions") || strings.Contains(out, "User-authored team definition:") {
+			t.Fatal("blank user instructions should not render a section")
+		}
+	}
+}
+
+// Status ownership must not ride along when a squad is a guest on another assignee's issue.
 func TestSquadOperatingProtocolScopesParentStatusOwnership(t *testing.T) {
 	guest := squadOperatingProtocolFor(false, leaderNoWorkflow)
 	compactGuest := strings.Join(strings.Fields(guest), " ")
@@ -98,6 +156,99 @@ func TestSquadOperatingProtocolLeavesDelegationDetailToCommentPolicy(t *testing.
 				if !strings.Contains(compact, want) {
 					t.Errorf("ownsIssueStatus=%v workflow=%v: safety instruction %q missing", ownsIssueStatus, workflow, want)
 				}
+			}
+		}
+	}
+}
+
+func TestSquadOperatingProtocolConsolidatesSharedRules(t *testing.T) {
+	for _, ownsIssueStatus := range []bool{false, true} {
+		for _, workflow := range []leaderWorkflow{leaderNoWorkflow, leaderWorkflowCurrentDaemon, leaderWorkflowLegacyDaemon, leaderWorkflowStepMoved} {
+			protocol := squadOperatingProtocolFor(ownsIssueStatus, workflow)
+			compact := strings.Join(strings.Fields(protocol), " ")
+			for _, once := range []string{
+				"[@Name](mention://<type>/<UUID>)",
+				"multica squad activity <issue-id> <outcome>",
+				"never post a second comment",
+			} {
+				if got := strings.Count(compact, once); got != 1 {
+					t.Errorf("ownsIssueStatus=%v workflow=%v: instruction %q occurs %d times, want once", ownsIssueStatus, workflow, once, got)
+				}
+			}
+			for _, want := range []string{
+				"**coordinate**, NOT to do the implementation work yourself",
+				"if none can do the task, explain the gap in a comment",
+				"Post a single comment on this issue",
+				"This is mandatory on every turn",
+				"Record it against the issue THIS turn is running on",
+				"ONLY if you have not already commented this turn",
+				"the assignment IS the trigger",
+				"Never both for the same work.",
+			} {
+				if !strings.Contains(compact, want) {
+					t.Errorf("ownsIssueStatus=%v workflow=%v: safety instruction %q missing", ownsIssueStatus, workflow, want)
+				}
+			}
+			stopStart := strings.Index(compact, "4. **Stop after dispatching.**")
+			stopEnd := strings.Index(compact, "5. **Re-evaluate on each trigger.**")
+			if stopStart < 0 || stopEnd <= stopStart {
+				t.Fatal("missing dispatch completion responsibility")
+			}
+			stop := compact[stopStart:stopEnd]
+			for _, prerequisite := range []string{
+				"delegation comment is posted",
+				"any handoff registration required by your instructions is complete",
+				"evaluation recorded (or its failure fallback applied)",
+			} {
+				if at := strings.Index(stop, prerequisite); at < 0 || at > strings.Index(stop, "end your turn") {
+					t.Errorf("ownsIssueStatus=%v workflow=%v: stopping must follow %q", ownsIssueStatus, workflow, prerequisite)
+				}
+			}
+			if strings.Contains(stop, "do not open files") {
+				t.Error("dispatch must not prohibit files needed for required handoff registration")
+			}
+		}
+	}
+}
+
+func TestSquadOperatingProtocolExecutionSkillReadiness(t *testing.T) {
+	for _, owns := range []bool{false, true} {
+		for _, workflow := range []leaderWorkflow{leaderNoWorkflow, leaderWorkflowCurrentDaemon, leaderWorkflowLegacyDaemon, leaderWorkflowStepMoved} {
+			full := squadOperatingProtocolFor(owns, workflow)
+			if got := squadOperatingProtocolWithExecutionSkill(owns, workflow, false); got != full {
+				t.Fatalf("owns=%v workflow=%v: absent skill changed full protocol", owns, workflow)
+			}
+			short := squadOperatingProtocolWithExecutionSkill(owns, workflow, true)
+			compact := strings.Join(strings.Fields(short), " ")
+			for _, want := range []string{
+				"You are this task's squad LEADER, regardless of how it reached you.",
+				"Coordinate, do not implement",
+				"built-in squad coordination skill identified in your runtime Skills section",
+				"roster skills and role",
+				"[@Name](mention://<type>/<UUID>)",
+				"Record every trigger on this turn's issue",
+				"multica squad activity <issue-id> <outcome> --reason",
+				"action, no_action, or failed",
+				"Successful no_action means NO comment",
+				"only if you have not commented",
+				"never post a second comment",
+				"End after dispatch, any required handoff registration, and activity recording (or that failure fallback)",
+				"@mention OR a todo child assigned to the agent, never both",
+			} {
+				if !strings.Contains(compact, want) {
+					t.Errorf("owns=%v workflow=%v: compact protocol missing %q", owns, workflow, want)
+				}
+			}
+			// Status authority remains verbatim, above the execution skill.
+			status := full[strings.Index(full, "\n6. ")+1 : strings.Index(full, "\n\nHard rules:")]
+			if !strings.HasSuffix(short, status) {
+				t.Errorf("owns=%v workflow=%v: compact protocol changed status authority", owns, workflow)
+			}
+			if strings.Contains(short, "multica-squad-coordination") || strings.Contains(short, "SKILL.md") {
+				t.Error("handler must not guess the collision-allocated skill name or directory")
+			}
+			if len(short)*2 >= len(full) {
+				t.Errorf("compact protocol not substantially shorter: %d vs %d bytes", len(short), len(full))
 			}
 		}
 	}

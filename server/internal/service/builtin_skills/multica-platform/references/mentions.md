@@ -75,17 +75,20 @@ match, or the link resolves to the wrong entity (or to nothing).
 | -------------------- | -------- | --------------- | -------------------------------------------------------- |
 | trigger an agent     | `agent`  | agent.id        | enqueues a run for that agent                            |
 | hand work to a squad | `squad`  | squad.id        | resolves the squad's `leader_id` and enqueues a run for the LEADER agent |
-| link a person        | `member` | member.user_id  | renders a link; enqueues NOTHING — no agent run          |
-| reference an issue   | `issue`  | issue.id        | renders a link; enqueues NOTHING — always safe           |
+| notify a person       | `member` | member.user_id  | creates a `mentioned` inbox item; enqueues no agent run |
+| reference an issue   | `issue`  | issue.id        | renders a link; enqueues NOTHING and creates no inbox item      |
 
 The backend computes the trigger set from two types only: the `squad` branch
 resolves the squad and adds its leader to the set; everything that is not
 `agent` after that is skipped, then the `agent` branch adds that agent. A
 `member` or `issue` mention reaches neither branch, so it enqueues no task.
 
-A `member` mention therefore does NOT make a person "run", and no notification
-is delivered through the comment path. What IS guaranteed is the contract above:
-only `agent` and `squad` mentions enqueue work.
+The separate comment and issue-description notification listener creates a
+`mentioned` inbox item for valid member mentions (and expands `squad` and `all`
+to human members), excluding the actor and muted recipients. Thus a member
+mention does NOT make a person run, but it can notify that person. System
+comments skip this notification listener. Only `agent` and `squad` mentions
+enqueue agent work.
 
 ## Preview and per-comment suppression
 
