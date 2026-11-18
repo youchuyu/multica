@@ -72,13 +72,14 @@ printf '%s\n' '{"type":"turn_end","message":{"role":"assistant","model":"test","
 		},
 	}
 	task := Task{
-		ID:             "task-pi-busy",
-		WorkspaceID:    "ws-pi",
-		RuntimeID:      "rt-pi",
-		IssueID:        "issue-pi",
-		AgentID:        "agent-pi",
-		AuthToken:      "mat_pi_busy",
-		PriorSessionID: priorSessionID,
+		LeaderRoleResolved: true,
+		ID:                 "task-pi-busy",
+		WorkspaceID:        "ws-pi",
+		RuntimeID:          "rt-pi",
+		IssueID:            "issue-pi",
+		AgentID:            "agent-pi",
+		AuthToken:          "mat_pi_busy",
+		PriorSessionID:     priorSessionID,
 		Agent: &AgentData{
 			ID:   "agent-pi",
 			Name: "pi-agent",

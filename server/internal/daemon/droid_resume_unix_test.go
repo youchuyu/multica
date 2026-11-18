@@ -60,7 +60,8 @@ case "$*" in
 					Agents: map[string]AgentEntry{"droid": {Path: fakeBin}}},
 			}
 			task := Task{
-				ID: "task-droid", WorkspaceID: "ws-droid", RuntimeID: "rt-droid", IssueID: "issue-droid",
+				LeaderRoleResolved: true,
+				ID:                 "task-droid", WorkspaceID: "ws-droid", RuntimeID: "rt-droid", IssueID: "issue-droid",
 				AgentID: "agent-droid", AuthToken: "mat_droid_fixture", PriorSessionID: "stale-session",
 				Agent: &AgentData{ID: "agent-droid", Name: "droid-agent", CustomEnv: map[string]string{"DROID_ATTEMPTS": attemptFile}},
 			}

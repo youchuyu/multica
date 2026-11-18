@@ -3,8 +3,10 @@ package protocol
 import "encoding/json"
 
 const (
-	DaemonCapabilitySkillBundlesV1      = "skill-bundles-v1"
-	DaemonCapabilityCoalescedCommentsV1 = "coalesced-comments-v1"
+	// Local defaults are compiled into the daemon; claims carry squad facts, not platform prose.
+	DaemonCapabilityLocalExecutionDefaultsV1 = "local-execution-defaults-v1"
+	DaemonCapabilitySkillBundlesV1           = "skill-bundles-v1"
+	DaemonCapabilityCoalescedCommentsV1      = "coalesced-comments-v1"
 	// DaemonCapabilityLocalWorktreeV1 advertises that the daemon implements
 	// worktree mode for local_directory resources (execution_mode=worktree).
 	//

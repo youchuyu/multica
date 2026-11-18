@@ -65,11 +65,12 @@ func TestHandleTask_DoesNotCallStartTaskItself(t *testing.T) {
 	})
 
 	task := Task{
-		ID:          "task-no-start",
-		WorkspaceID: "ws-no-start",
-		RuntimeID:   "rt-1",
-		IssueID:     "issue-no-start",
-		Agent:       &AgentData{Name: "test-agent"},
+		LeaderRoleResolved: true,
+		ID:                 "task-no-start",
+		WorkspaceID:        "ws-no-start",
+		RuntimeID:          "rt-1",
+		IssueID:            "issue-no-start",
+		Agent:              &AgentData{Name: "test-agent"},
 	}
 
 	d.handleTask(context.Background(), task, 0)
@@ -137,12 +138,13 @@ func TestRunTask_StartTaskCalledAfterWorkdirOnDisk(t *testing.T) {
 	}
 
 	task := Task{
-		ID:          taskID,
-		WorkspaceID: workspaceID,
-		RuntimeID:   "rt-1",
-		IssueID:     "issue-runtask",
-		AgentID:     "agent-runtask",
-		Agent:       &AgentData{ID: "agent-runtask", Name: "test-agent"},
+		LeaderRoleResolved: true,
+		ID:                 taskID,
+		WorkspaceID:        workspaceID,
+		RuntimeID:          "rt-1",
+		IssueID:            "issue-runtask",
+		AgentID:            "agent-runtask",
+		Agent:              &AgentData{ID: "agent-runtask", Name: "test-agent"},
 	}
 
 	taskLog := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -210,12 +212,13 @@ printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"session_id
 	}
 
 	task := Task{
-		ID:          taskID,
-		WorkspaceID: workspaceID,
-		RuntimeID:   "rt-1",
-		IssueID:     "issue-private-temp",
-		AgentID:     "agent-private-temp",
-		AuthToken:   "mat_private_temp",
+		LeaderRoleResolved: true,
+		ID:                 taskID,
+		WorkspaceID:        workspaceID,
+		RuntimeID:          "rt-1",
+		IssueID:            "issue-private-temp",
+		AgentID:            "agent-private-temp",
+		AuthToken:          "mat_private_temp",
 		Agent: &AgentData{
 			ID:   "agent-private-temp",
 			Name: "test-agent",
@@ -444,12 +447,13 @@ printf '%s\n' '{"type":"result","subtype":"success","is_error":false,"session_id
 	}
 
 	task := Task{
-		ID:          taskID,
-		WorkspaceID: workspaceID,
-		RuntimeID:   "rt-1",
-		IssueID:     "issue-temp-base",
-		AgentID:     "agent-temp-base",
-		AuthToken:   "mat_temp_base",
+		LeaderRoleResolved: true,
+		ID:                 taskID,
+		WorkspaceID:        workspaceID,
+		RuntimeID:          "rt-1",
+		IssueID:            "issue-temp-base",
+		AgentID:            "agent-temp-base",
+		AuthToken:          "mat_temp_base",
 		Agent: &AgentData{
 			ID:   "agent-temp-base",
 			Name: "test-agent",
@@ -542,12 +546,13 @@ printf 'ran\n' > "$CAPTURE_FILE"
 	}
 
 	task := Task{
-		ID:          "task-temp-base-invalid",
-		WorkspaceID: "ws-temp-base-invalid",
-		RuntimeID:   "rt-1",
-		IssueID:     "issue-temp-base-invalid",
-		AgentID:     "agent-temp-base-invalid",
-		AuthToken:   "mat_temp_base_invalid",
+		LeaderRoleResolved: true,
+		ID:                 "task-temp-base-invalid",
+		WorkspaceID:        "ws-temp-base-invalid",
+		RuntimeID:          "rt-1",
+		IssueID:            "issue-temp-base-invalid",
+		AgentID:            "agent-temp-base-invalid",
+		AuthToken:          "mat_temp_base_invalid",
 		Agent: &AgentData{
 			ID:        "agent-temp-base-invalid",
 			Name:      "test-agent",
@@ -625,6 +630,7 @@ func TestRunTask_ExtendsPrepareLeaseDuringStartTask(t *testing.T) {
 	}
 
 	task := Task{
+		LeaderRoleResolved:  true,
 		ID:                  taskID,
 		WorkspaceID:         workspaceID,
 		RuntimeID:           "rt-1",
@@ -745,6 +751,7 @@ func prepareTimeoutStopsLeaseDuringBlockedStart(t *testing.T, budget time.Durati
 	}
 
 	task := Task{
+		LeaderRoleResolved:  true,
 		ID:                  "task-runtask-start-timeout",
 		StartClaimSupported: true,
 		DispatchedAt:        "2026-09-17T09:00:00.123456Z",
@@ -856,11 +863,12 @@ func TestHandleTask_KeepsEnvRootActiveAcrossCompletion(t *testing.T) {
 	})
 
 	task := Task{
-		ID:          taskID,
-		WorkspaceID: workspaceID,
-		RuntimeID:   "rt-1",
-		IssueID:     "issue-active-during-complete",
-		Agent:       &AgentData{Name: "test-agent"},
+		LeaderRoleResolved: true,
+		ID:                 taskID,
+		WorkspaceID:        workspaceID,
+		RuntimeID:          "rt-1",
+		IssueID:            "issue-active-during-complete",
+		Agent:              &AgentData{Name: "test-agent"},
 	}
 
 	d.handleTask(context.Background(), task, 0)

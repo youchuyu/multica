@@ -80,7 +80,8 @@ exit 1
 			if failLaunch {
 				fail = "true"
 			}
-			task := Task{ID: "task-clock", WorkspaceID: "ws-clock", RuntimeID: "rt-clock", IssueID: "issue-clock", AgentID: "agent-clock", AuthToken: "mat_clock", PriorSessionID: "ses-old", Agent: &AgentData{ID: "agent-clock", Name: "clock-agent", CustomEnv: map[string]string{"CLOCK_FAIL_LAUNCH": fail, "CLOCK_ARGS": argsPath, "CLOCK_PROMPT": promptPath}}}
+			task := Task{
+				LeaderRoleResolved: true, ID: "task-clock", WorkspaceID: "ws-clock", RuntimeID: "rt-clock", IssueID: "issue-clock", AgentID: "agent-clock", AuthToken: "mat_clock", PriorSessionID: "ses-old", Agent: &AgentData{ID: "agent-clock", Name: "clock-agent", CustomEnv: map[string]string{"CLOCK_FAIL_LAUNCH": fail, "CLOCK_ARGS": argsPath, "CLOCK_PROMPT": promptPath}}}
 			seed := task
 			seed.ID, seed.PriorSessionID = "seed-clock", ""
 			prepared, err := d.runTask(context.Background(), seed, "opencode", 0, logger)
@@ -139,7 +140,8 @@ func TestOpenCodeClockSkewClassification(t *testing.T) {
 func TestOpenCodeClockGateUnverifiedPreservesResume(t *testing.T) {
 	var logs strings.Builder
 	logger := slog.New(slog.NewJSONHandler(&logs, nil))
-	task := Task{PriorSessionID: "ses-old"}
+	task := Task{
+		LeaderRoleResolved: true, PriorSessionID: "ses-old"}
 	carrier := execenv.TaskContextForEnv{PriorSessionResumed: true}
 	retired := gateOpenCodeResumeToSaneClock(context.Background(), &task, &carrier, "opencode", agent.Config{ExecutablePath: filepath.Join(t.TempDir(), "missing"), BuiltinRuntime: true, CLIVersion: "opencode v2.0.10"}, "", nil, logger)
 	if retired != "" || task.PriorSessionID != "ses-old" || !carrier.PriorSessionResumed || task.PriorSessionResumeUnavailable {

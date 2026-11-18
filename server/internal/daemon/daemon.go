@@ -7230,13 +7230,23 @@ func (d *Daemon) ensureTaskSkillBundles(ctx context.Context, task *Task) error {
 		resolved[skillRefKey(bundle.Source, bundle.ID)] = bundle
 	}
 
-	skills := make([]SkillData, 0, len(task.Agent.SkillRefs))
+	// Preserve inline user skills when a claim mixes inline and referenced bundles.
+	skills := append([]SkillData(nil), task.Agent.Skills...)
 	for _, ref := range task.Agent.SkillRefs {
 		bundle, ok := resolved[skillRefKey(ref.Source, ref.ID)]
 		if !ok {
 			return fmt.Errorf("skill bundle missing after resolve: skill_id=%s source=%s hash=%s", ref.ID, ref.Source, ref.Hash)
 		}
-		skills = append(skills, bundle)
+		duplicate := false
+		for _, inline := range skills {
+			if bundle.ID != "" && inline.ID == bundle.ID && inline.Source == bundle.Source {
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
+			skills = append(skills, bundle)
+		}
 	}
 	task.Agent.Skills = skills
 	return nil
@@ -7912,6 +7922,10 @@ func (d *Daemon) runTask(ctx context.Context, task Task, provider string, slot i
 		return TaskResult{}, fmt.Errorf("refusing to spawn agent: task has no workspace_id (task_id=%s)", task.ID)
 	}
 
+	// Text generation is not an execution gate. Older servers keep their original
+	// declarations; optional structured facts let us render squad defaults locally.
+	prepareLocalExecutionText(&task)
+
 	prepareTimeout := d.effectiveTaskPrepareTimeout()
 	prepareCtx, cancelPrepare := context.WithTimeoutCause(ctx, prepareTimeout, errTaskPrepareTimeout)
 	prepareComplete := false
@@ -7986,9 +8000,12 @@ func (d *Daemon) runTask(ctx context.Context, task Task, provider string, slot i
 	stopPrepareLease := d.startTaskPrepareLeaseExtender(prepareCtx, task, taskLog)
 	defer stopPrepareLease()
 
+	normalizeEquivalentLegacyExecutionSkills(&task)
+	filterLocalExecutionSkillRefs(&task)
 	if err := d.ensureTaskSkillBundles(prepareCtx, &task); err != nil {
 		return TaskResult{}, err
 	}
+	mergeLocalExecutionSkills(&task)
 	phaseRecorder.Mark(taskPhaseSkillsReady)
 
 	agentName := "agent"

@@ -104,7 +104,7 @@ func TestIssueExecutionSkillDoesNotRouteOtherSurfaces(t *testing.T) {
 
 func TestIssueExecutionSkillContracts(t *testing.T) {
 	t.Parallel()
-	dir := filepath.Join("..", "..", "service", "builtin_skills", issueExecutionSkillName)
+	dir := filepath.Join("..", "..", "..", "pkg", "executiondefaults", "skills", issueExecutionSkillName)
 	read := func(name string) string {
 		t.Helper()
 		b, err := os.ReadFile(filepath.Join(dir, name))

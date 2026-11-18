@@ -2,6 +2,8 @@ package handler
 
 import (
 	"context"
+	"github.com/multica-ai/multica/server/pkg/protocol"
+	"github.com/multica-ai/multica/server/pkg/squaddefaults"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -9,239 +11,29 @@ import (
 	db "github.com/multica-ai/multica/server/pkg/db/generated"
 )
 
-// squadOperatingProtocolHeader is the generated default coordination briefing
-// prepended to every squad-leader claim. It explains the leader's coordinator
-// role, the @mention dispatch mechanism, and the stop-after-dispatch contract.
-// Responsibility 6 (parent issue status) is appended separately by
-// squadOperatingProtocolFor — it is the only part that varies by whether this
-// squad actually owns the issue.
-//
-// Keep this text English-only (matches existing agent-harness conventions)
-// and keep the mention syntax exactly aligned with util.MentionRe — the
-// "Squad Roster" block below renders copyable examples as inline code so the
-// briefing itself does not trigger, and the pasted syntax round-trips
-// through util.ParseMentions. The protocol text refers to that format.
-//
-// Responsibility 5 owns the no_action silence rule and refers to responsibility
-// 3 for activity-failure recovery. Other runtime surfaces refer back here.
-const squadProtocolContext = `Generated coordination defaults: user-defined agent roles and team definitions
-(including Squad Instructions below) take precedence over these defaults.
-They do not expand Agent Identity authority or override the parent-status
-permission boundary below.
+// Legacy handler names alias the canonical locally compiled defaults.
+const squadProtocolContext = squaddefaults.SquadProtocolContext
+const squadOperatingProtocolHeader = squaddefaults.SquadOperatingProtocolHeader
+const squadParentStatusOwned = squaddefaults.SquadParentStatusOwned
+const leaderNoWorkflow = squaddefaults.LeaderNoWorkflow
+const leaderWorkflowCurrentDaemon = squaddefaults.LeaderWorkflowCurrentDaemon
+const leaderWorkflowLegacyDaemon = squaddefaults.LeaderWorkflowLegacyDaemon
+const leaderWorkflowStepMoved = squaddefaults.LeaderWorkflowStepMoved
+const squadParentStatusStepMoved = squaddefaults.SquadParentStatusStepMoved
+const squadParentStatusOwnedInWorkflow = squaddefaults.SquadParentStatusOwnedInWorkflow
+const squadParentStatusWorkflowOverridesRuntime = squaddefaults.SquadParentStatusWorkflowOverridesRuntime
+const squadParentStatusNotOwned = squaddefaults.SquadParentStatusNotOwned
+const squadOperatingProtocolHardRules = squaddefaults.SquadOperatingProtocolHardRules
+const squadSteerRule = squaddefaults.SquadSteerRule
+const squadOperatingProtocolSkillHeader = squaddefaults.SquadOperatingProtocolSkillHeader
 
-`
+type leaderWorkflow = squaddefaults.LeaderWorkflow
 
-const squadOperatingProtocolHeader = `## Squad Operating Protocol
-
-` + squadProtocolContext + `**You are this task's squad LEADER, regardless of how it reached you.**
-Your job is to **coordinate**, NOT to do the implementation work yourself,
-even when the task directly asks you to do it. Delegate to suitable roster
-members; if none can do the task, explain the gap in a comment and @mention
-the issue's reporter if possible rather than silently doing the work.
-
-Your responsibilities, in order:
-
-1. **Read the issue** (title, description, latest comments, acceptance
-   criteria) and decide which squad member is best suited to do the work.
-   Match the task to each member's listed **skills** and role in the Squad
-   Roster below — prefer the member whose skills cover the work.
-2. **Delegate by @mention.** Post a single comment on this issue that
-   @mentions the chosen member(s) and tells them what to do.
-   - Use the exact mention markdown shown in the Squad Roster below:
-     ` + "`" + `[@Name](mention://<type>/<UUID>)` + "`" + `. A plain "@name" does not
-     trigger anyone. Do NOT @mention members who don't appear in the Squad Roster.
-3. **Record your evaluation.** After every trigger — whether you delegated,
-   decided no action is needed, or encountered an error — record it:
-   ` + "`" + `multica squad activity <issue-id> <outcome> --reason "<short reason>"` + "`" + `
-   Outcome values: ` + "`" + `action` + "`" + ` (you delegated or acted),
-   ` + "`" + `no_action` + "`" + ` (you evaluated and decided nothing is needed),
-   ` + "`" + `failed` + "`" + ` (you hit an error).
-   This is mandatory on every turn — it records your decision in the
-   issue timeline so humans can see you evaluated the trigger.
-   Record it against the issue THIS turn is running on (the issue id in
-   your task context). It does not need to be assigned to your squad.
-   If the call fails, make sure the turn still leaves a record, without
-   breaking the one-comment-per-turn rule: post a short comment with the
-   outcome and the error ONLY if you have not already commented this turn
-   (the no_action case). If you already posted a delegation comment, that
-   comment is the record — never post a second comment just to report the error.
-4. **Stop after dispatching.** Once your delegation comment is posted,
-   any handoff registration required by your instructions is complete,
-   and evaluation recorded (or its failure fallback applied), end your turn.
-   Do not continue implementation work. You will be re-triggered
-   automatically when:
-   - a delegated member posts an update or asks you a question;
-   - a delegated member finishes and the issue moves forward;
-   - someone @mentions you again on this issue.
-5. **Re-evaluate on each trigger.** When you wake up again, read the new
-   activity and decide whether to delegate the next step, escalate to
-   the human reporter, or close the loop. If no action is needed
-   (e.g. a member posted a progress update that requires no response),
-   record ` + "`" + `no_action` + "`" + ` and exit silently. Exiting silently
-   means posting NO comment at all — not one announcing no_action, not
-   one acknowledging another agent, not one saying you are exiting. The
-   ` + "`" + `squad activity` + "`" + ` call IS the record; a comment on top of
-   it is noise. That prohibition holds only while the call succeeds — if
-   it errors, responsibility 3 applies and the turn leaves one short
-   comment instead.`
-
-// squadParentStatusOwned is responsibility 6 for the case where the issue this
-// leader was woken on is assigned to THIS squad. Only then does the leader own
-// the parent's status arc.
-//
-// Since MUL-6417 the runtime brief has no grant routing that consumes this
-// section by name: the unified workflow writes status as the work changes it
-// (in_progress when a turn starts advancing the issue's ask, the reached
-// state at turn end), and the leader's only brief-side special case is that a
-// dispatch turn leaves the parent in_progress. This section's
-// job is the owning/guest permission boundary, drawn at the Agent Identity
-// layer (Instruction Precedence puts it above the workflow). The owning
-// leader needs the standing wrap-up instruction below — the @mention-dispatch
-// shape (no child issues, so no sub-issue wakeup) never produces a
-// trigger that asks for in_review, so without it the parent would sit in
-// in_progress forever; the guest leader gets the prohibition instead
-// (squadParentStatusNotOwned). Both compositions are pinned by
-// handler/squad_parent_status_contract_test.go.
-const squadParentStatusOwned = `6. **Own the parent issue status.** This issue is assigned to your squad,
-   so its status is yours to manage (unless Agent Identity forbids status
-   changes). On the first assignment turn, move the parent to
-   ` + "`" + `in_progress` + "`" + ` and keep it there while members work — a successful
-   dispatch is not completion. On later turns, do not flip status for
-   routine progress updates. When you confirm the overall goal is met, run
-   ` + "`" + `multica issue status <issue-id> in_review` + "`" + ` — this responsibility is
-   itself the standing instruction that authorizes that change, so do it even
-   when no comment asked you to. Leave ` + "`" + `done` + "`" + ` to a human reviewer or
-   existing integrations (for example a PR with close intent that merges).`
-
-// leaderWorkflow says whether an owning leader's issue follows a project
-// workflow that came with the claim, and whether the daemon's runtime brief
-// still states the built-in in_progress / in_review rules (MUL-8145).
-type leaderWorkflow int
-
-const (
-	leaderNoWorkflow leaderWorkflow = iota
-	// leaderWorkflowCurrentDaemon: the runtime brief points at
-	// [Project workflow] and states no built-in moves.
-	leaderWorkflowCurrentDaemon
-	// leaderWorkflowLegacyDaemon: the runtime brief still says to set
-	// in_progress first and in_review on delivery, so responsibility 6 has
-	// to rule those moves out for this issue.
-	leaderWorkflowLegacyDaemon
-	// leaderWorkflowStepMoved: the run's binding no longer matches the issue,
-	// so it must leave status unchanged even when its squad owns the issue.
-	leaderWorkflowStepMoved
-)
-
-const squadParentStatusStepMoved = `6. **Leave the parent issue's status unchanged for this run.** This issue
-   is assigned to your squad, but this run's workflow binding no longer matches
-   the issue's current step. Follow the explanation in ` + "`" + `[Project workflow]` + "`" + `.
-   Keep the current status even when you confirm the overall goal is met; do
-   not change it to mark progress or delivery. This overrides the status rules
-   in your runtime instructions. Leave a comment if something needs attention;
-   a member can review the current state and explicitly rerun the work.`
-
-// squadParentStatusOwnedInWorkflow is responsibility 6 for an owning leader
-// whose issue follows a project workflow that came with the claim (MUL-8145).
-// The workflow may list neither in_progress nor in_review — the server rejects
-// a status outside it — and entering a step with a handler reassigns the
-// issue, so squadParentStatusOwned's "move to in_progress, then in_review"
-// would be refused or hand the parent away mid-dispatch. The ownership
-// boundary and the standing wrap-up authorization stay; the moves become the
-// [Project workflow] commands the runtime brief points at.
-const squadParentStatusOwnedInWorkflow = `6. **Own the parent issue status — through its project workflow.** This issue
-   is assigned to your squad and follows its project workflow, so its status
-   is yours to move (unless Agent Identity forbids status changes), using only
-   the commands in ` + "`" + `[Project workflow]` + "`" + `. Delegate only the current
-   step's work and pass its instructions and constraints to members in your
-   delegation comment; their observer brief does not include step instructions.
-   The parent stays at its
-   current step while members work — a successful dispatch is not completion.
-   On later turns, do not move it for routine progress updates. When you
-   confirm the current step's goal is met, run that block's Step done command — this
-   responsibility is itself the standing instruction that authorizes that
-   change, so do it even when no comment asked you to.`
-
-// squadParentStatusWorkflowOverridesRuntime follows
-// squadParentStatusOwnedInWorkflow for a daemon whose runtime brief still
-// states the built-in moves.
-const squadParentStatusWorkflowOverridesRuntime = `
-   This overrides the in_progress / in_review rules in your runtime
-   instructions: never set either on this issue just to mark progress or
-   delivery.`
-
-// squadParentStatusNotOwned is responsibility 6 for every other leader path:
-// an @squad mention on an issue owned by someone else (MUL-3724), and
-// quick-create, where no issue exists yet on this turn. Granting status
-// ownership there would let a squad that was merely pulled in to answer a
-// question push another assignee's in-flight issue to in_review.
-const squadParentStatusNotOwned = `6. **Do NOT change this issue's status.** This issue is not assigned to your
-   squad — you were pulled in by an @mention (or this is a quick-create turn,
-   where the issue does not exist yet). Its status belongs to its own
-   assignee. Answer, delegate, or escalate as usual, but never run
-   ` + "`" + `multica issue status` + "`" + ` on it, no matter how complete the work looks
-   to you.`
-
-const squadOperatingProtocolHardRules = `Hard rules:
-- A child issue you create with ` + "`" + `--status todo` + "`" + ` and an agent assignee
-  already fires that agent automatically — the assignment IS the trigger.
-  If you also @mention the same agent on this parent issue for the same
-  work, the agent runs twice in parallel (once from the mention, once
-  from the assignment). Pick exactly one path: either delegate by
-  @mention on this issue, or create a ` + "`" + `todo` + "`" + ` child issue assigned to
-  them. Never both for the same work.`
-
-// squadSteerRule is added to the hard rules only for a daemon that ships a
-// CLI with --steer (protocol.DaemonCapabilityCLICommentSteerV1): an older CLI
-// rejects the flag and the comment is never posted.
-const squadSteerRule = `- A worker already running on this issue gets a new comment only after its
-  run ends. To correct it mid-run (wrong direction, a missing fact, a
-  narrower scope), steer that run instead: add the comment with
-  ` + "`" + `--steer <run-id>` + "`" + ` (run ids from ` + "`" + `multica issue runs <issue-id> --active` + "`" + `), or
-  ` + "`" + `--steer-active` + "`" + ` for every running worker you may steer. Only a run that
-  accepts additional messages (` + "`" + `can_supplement: true` + "`" + ` in
-  ` + "`" + `multica issue runs <issue-id> --active --output json` + "`" + `) can be steered, and
-  the command reports per run whether it was. New work is still a normal
-  delegation.`
-
-const squadOperatingProtocolSkillHeader = `## Squad Operating Protocol
-
-` + squadProtocolContext + `**You are this task's squad LEADER, regardless of how it reached you.**
-Coordinate, do not implement. Read the built-in squad coordination skill identified
-in your runtime Skills section before evaluating this trigger; it owns the leader
-cycle. Delegate by roster skills and role using only the exact roster mention
-markdown ` + "`" + `[@Name](mention://<type>/<UUID>)` + "`" + `; plain @names do not trigger.
-If no member fits, explain the gap and escalate to the reporter if possible.
-Record every trigger on this turn's issue with
-` + "`" + `multica squad activity <issue-id> <outcome> --reason "<short reason>"` + "`" + `
-(action, no_action, or failed). Successful no_action means NO comment. If activity
-fails, leave one short outcome/error comment only if you have not commented;
-never post a second comment. End after dispatch, any required handoff registration,
-and activity recording (or that failure fallback). Pick one trigger per work item:
-a roster @mention OR a todo child assigned to the agent, never both.`
-
-// squadOperatingProtocolFor assembles the protocol, selecting the parent-status
-// responsibility that matches this leader's actual authority over the issue
-// and, for an owner, whether the issue's project workflow governs its moves.
-func squadOperatingProtocolFor(ownsIssueStatus bool, workflow leaderWorkflow) string {
-	return squadOperatingProtocolWithExecutionSkill(ownsIssueStatus, workflow, false)
+func squadOperatingProtocolFor(owns bool, workflow leaderWorkflow) string {
+	return squaddefaults.SquadOperatingProtocolFor(owns, workflow)
 }
-
-func squadOperatingProtocolWithExecutionSkill(ownsIssueStatus bool, workflow leaderWorkflow, executionSkillAvailable bool) string {
-	status := squadParentStatusNotOwned
-	switch {
-	case ownsIssueStatus && workflow == leaderWorkflowStepMoved:
-		status = squadParentStatusStepMoved
-	case ownsIssueStatus && workflow == leaderWorkflowCurrentDaemon:
-		status = squadParentStatusOwnedInWorkflow
-	case ownsIssueStatus && workflow == leaderWorkflowLegacyDaemon:
-		status = squadParentStatusOwnedInWorkflow + squadParentStatusWorkflowOverridesRuntime
-	case ownsIssueStatus:
-		status = squadParentStatusOwned
-	}
-	if executionSkillAvailable {
-		return squadOperatingProtocolSkillHeader + "\n\n" + status
-	}
-	return squadOperatingProtocolHeader + "\n" + status + "\n\n" + squadOperatingProtocolHardRules
+func squadOperatingProtocolWithExecutionSkill(owns bool, workflow leaderWorkflow, skill bool) string {
+	return squaddefaults.SquadOperatingProtocolWithExecutionSkill(owns, workflow, skill)
 }
 
 // buildSquadLeaderBriefing composes the generated and user-authored briefing for a
@@ -281,23 +73,7 @@ func buildSquadLeaderBriefingWithExecutionSkill(ctx context.Context, q *db.Queri
 
 // renderSquadLeaderBriefing keeps generated defaults, roster facts, and user text distinct.
 func renderSquadLeaderBriefing(squad db.Squad, roster string, ownsIssueStatus bool, workflow leaderWorkflow, steer bool, executionSkillAvailable bool) string {
-	var sb strings.Builder
-	sb.WriteString(squadOperatingProtocolWithExecutionSkill(ownsIssueStatus, workflow, executionSkillAvailable))
-	if steer {
-		sb.WriteString("\n")
-		sb.WriteString(squadSteerRule)
-	}
-	sb.WriteString("\n\n")
-	sb.WriteString(roster)
-
-	if strings.TrimSpace(squad.Instructions) != "" {
-		sb.WriteString("\n\n## Squad Instructions (")
-		sb.WriteString(squad.Name)
-		sb.WriteString(")\n\n")
-		sb.WriteString("User-authored team definition: overrides generated coordination defaults, not Agent Identity authority or the parent-status permission boundary.\n\n")
-		sb.WriteString(squad.Instructions)
-	}
-	return sb.String()
+	return squaddefaults.Render(squad.Name, squad.Instructions, roster, ownsIssueStatus, workflow, steer, executionSkillAvailable, true)
 }
 
 // attachSquadBriefing preserves the legacy wire contract for clients that cannot render a separate block.
@@ -470,4 +246,20 @@ func formatRosterRow(name, kind, role, skills, mention string) string {
 // uses the mention:// scheme with the entity type and UUID.
 func formatMention(name, mentionType, id string) string {
 	return "[@" + name + "](mention://" + mentionType + "/" + id + ")"
+}
+
+// buildSquadContext transports only user declarations, roster facts and permission facts.
+func buildSquadContext(ctx context.Context, q *db.Queries, squad db.Squad, owns bool, workflow leaderWorkflow) *protocol.SquadContext {
+	return newSquadContext(squad, buildSquadRoster(ctx, q, squad), owns, workflow)
+}
+
+func newSquadContext(squad db.Squad, roster string, owns bool, workflow leaderWorkflow) *protocol.SquadContext {
+	mode := protocol.SquadWorkflowNone
+	switch workflow {
+	case leaderWorkflowCurrentDaemon, leaderWorkflowLegacyDaemon:
+		mode = protocol.SquadWorkflowProject
+	case leaderWorkflowStepMoved:
+		mode = protocol.SquadWorkflowStepMoved
+	}
+	return &protocol.SquadContext{SchemaVersion: protocol.SquadContextSchemaV1, SquadID: util.UUIDToString(squad.ID), SquadName: squad.Name, LeaderID: util.UUIDToString(squad.LeaderID), UserInstructions: squad.Instructions, RosterFacts: roster, OwnsParentStatus: &owns, Workflow: mode}
 }

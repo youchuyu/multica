@@ -1,0 +1,10 @@
+6. **Own the parent issue status.** This issue is assigned to your squad,
+   so its status is yours to manage (unless Agent Identity forbids status
+   changes). On the first assignment turn, move the parent to
+   `in_progress` and keep it there while members work — a successful
+   dispatch is not completion. On later turns, do not flip status for
+   routine progress updates. When you confirm the overall goal is met, run
+   `multica issue status <issue-id> in_review` — this responsibility is
+   itself the standing instruction that authorizes that change, so do it even
+   when no comment asked you to. Leave `done` to a human reviewer or
+   existing integrations (for example a PR with close intent that merges).

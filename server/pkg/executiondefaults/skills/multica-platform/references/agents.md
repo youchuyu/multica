@@ -345,8 +345,9 @@ multica agent skills list <agent-id> --output json
 
 At claim time the daemon assembles the agent's skills as workspace-bound skills
 FIRST, then appends the platform built-in skills. Each bound skill contributes
-its content plus its supporting files; built-in skills ship with the server and
-are loaded the same way. Both reach the provider as skill content — which is why
+its content plus its supporting files. Platform and execution defaults ship with
+the local CLI/daemon build; workspace and system-agent-specific skills remain
+server-supplied. Both reach the provider as skill content — which is why
 capability belongs in a bound skill, not pasted into `instructions`.
 
 ## Side effects needing approval

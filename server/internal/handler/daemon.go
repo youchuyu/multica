@@ -3092,6 +3092,12 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 		agentSkillCount = len(skills)
 		builtinSkills := h.TaskService.BuiltinSkills(agent.SystemKey.String, legacySkillRedirects)
 		builtinSkillCount = len(builtinSkills)
+		if requestHasClientCapability(r, protocol.DaemonCapabilityLocalExecutionDefaultsV1) {
+			for i := range builtinSkills {
+				builtinSkills[i].ID = service.BuiltinSkillID(builtinSkills[i].Name)
+				builtinSkills[i].Source = "builtin"
+			}
+		}
 		skills = append(skills, builtinSkills...)
 		resp.Agent.Skills = skills
 	}
@@ -3256,8 +3262,14 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 					ownsIssueStatus := issue.AssigneeType.Valid &&
 						issue.AssigneeType.String == "squad" &&
 						uuidToString(issue.AssigneeID) == uuidToString(squad.ID)
-					briefing := buildSquadLeaderBriefingWithExecutionSkill(r.Context(), h.Queries, squad, ownsIssueStatus, leaderWorkflow, requestHasClientCapability(r, protocol.DaemonCapabilityCLICommentSteerV1), requestHasClientCapability(r, protocol.DaemonCapabilityExecutionSkillsV1) && claimHasBuiltinSkill(resp.Agent, service.SquadCoordinationSkillName))
-					attachSquadBriefing(resp.Agent, briefing, requestHasClientCapability(r, protocol.DaemonCapabilitySquadBriefingV1))
+					if requestHasClientCapability(r, protocol.DaemonCapabilityLocalExecutionDefaultsV1) {
+						resp.Agent.SquadContext = buildSquadContext(r.Context(), h.Queries, squad, ownsIssueStatus, leaderWorkflow)
+						resp.SquadID = uuidToString(squad.ID)
+						resp.SquadName = squad.Name
+					} else {
+						briefing := buildSquadLeaderBriefingWithExecutionSkill(r.Context(), h.Queries, squad, ownsIssueStatus, leaderWorkflow, requestHasClientCapability(r, protocol.DaemonCapabilityCLICommentSteerV1), requestHasClientCapability(r, protocol.DaemonCapabilityExecutionSkillsV1) && claimHasBuiltinSkill(resp.Agent, service.SquadCoordinationSkillName))
+						attachSquadBriefing(resp.Agent, briefing, requestHasClientCapability(r, protocol.DaemonCapabilitySquadBriefingV1))
+					}
 					injected = true
 					slog.Debug("injected squad leader briefing",
 						"squad_id", uuidToString(squad.ID),
@@ -4082,8 +4094,12 @@ func (h *Handler) buildClaimedTaskResponse(r *http.Request, task *db.AgentTaskQu
 						// status to own on this turn. Once the leader opens the
 						// issue with the squad as assignee, the issue-bound
 						// claim path above grants ownership.
-						briefing := buildSquadLeaderBriefing(r.Context(), h.Queries, squad, false, leaderNoWorkflow, requestHasClientCapability(r, protocol.DaemonCapabilityCLICommentSteerV1))
-						attachSquadBriefing(resp.Agent, briefing, requestHasClientCapability(r, protocol.DaemonCapabilitySquadBriefingV1))
+						if requestHasClientCapability(r, protocol.DaemonCapabilityLocalExecutionDefaultsV1) {
+							resp.Agent.SquadContext = buildSquadContext(r.Context(), h.Queries, squad, false, leaderNoWorkflow)
+						} else {
+							briefing := buildSquadLeaderBriefing(r.Context(), h.Queries, squad, false, leaderNoWorkflow, requestHasClientCapability(r, protocol.DaemonCapabilityCLICommentSteerV1))
+							attachSquadBriefing(resp.Agent, briefing, requestHasClientCapability(r, protocol.DaemonCapabilitySquadBriefingV1))
+						}
 						// Surface the squad identity to the daemon so the
 						// quick-create prompt defaults the new issue's
 						// assignee to the squad, not the leader agent.

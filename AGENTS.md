@@ -29,6 +29,12 @@ Multica is a task management platform where people and agents collaborate on iss
 - Each workspace declares its directly imported external dependencies. A dependency declared by two or more workspaces, or already in the `pnpm-workspace.yaml` catalog, uses `catalog:`; CI runs `scripts/check-dependency-catalog.mjs`, whose allowlist records known drift awaiting an upgrade. Mobile is exempt and pins Expo/React Native-aligned versions in its own manifest.
 - This section is the source for the package-boundary table in `apps/docs/content/docs/developers/conventions*.mdx` (every locale); change them together.
 
+## Runtime instruction ownership
+
+- Platform execution defaults are compiled into the CLI/daemon: maintain execution Skills in `server/pkg/executiondefaults/skills/` and Squad protocol text in `server/pkg/squaddefaults/`. Do not duplicate their bodies in handler templates. Legacy server delivery uses the same canonical sources for older clients.
+- Claims remain authoritative for user-authored Agent/Squad instructions, roster facts, task identity and permissions. Runtime brief templates and built-in execution Skills come from the local CLI build. Optional structured `squad_context` permits local Squad text rendering after validating its facts; missing or unsupported metadata preserves the supplied briefing and never becomes an additional task-start gate. Do not re-read declarations over REST or split user Markdown to reconstruct transport metadata. Legacy generated protocol text may be replaced only by a complete frozen template match with the claimed leader roster identity; preserve explicit status authority and all surrounding user/roster bytes. Unknown variants remain unchanged and never block execution. Project membership does not require a workflow or a new protocol.
+- Building a CLI does not install it or restart an existing daemon. Do not write a test build over an auto-reload-watched executable unless installation/restart is authorized.
+
 ## Development and Verification
 
 Use `Makefile`, workspace `package.json` files, and `pnpm-workspace.yaml` for current commands and versions. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and worktree operations.
@@ -135,3 +141,8 @@ Workspace-scoped queries filter by `workspace_id`; membership gates access and `
 - Use names, types, and tests to express behavior. Code comments are English and kept for non-obvious rationale and constraints; remove superseded plans and incident narratives when updating code. Preserve tool directives and mixed-version contracts.
 - New global pre-workspace routes use a single word or `/{noun}/{verb}`, not hyphenated root names. Update `server/internal/handler/reserved_slugs.json`, run `pnpm generate:reserved-slugs`, and commit `packages/core/paths/reserved-slugs.ts` when changing reserved slugs.
 - Use atomic conventional commits and the repository PR template. Follow the [pull request requirements](CONTRIBUTING.md#pull-request-requirements): Problem, Goal, Proposal (high-level design understandable without much background), Alternatives (optional), and Screenshots. Attach screenshots or a screen recording for UI or interaction changes (missing both means rejection by default). For releases, follow [.github/RELEASING.md](.github/RELEASING.md); default to a patch bump unless specified otherwise.
+
+
+## 说明
+
+当前为本地构建的版本，只有能力优化cli相关的内容，需要确保升级不会影响和已有服务端的交互

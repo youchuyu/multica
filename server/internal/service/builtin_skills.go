@@ -4,7 +4,10 @@ import (
 	"embed"
 	"io/fs"
 	"path"
+	"sort"
 	"strings"
+
+	"github.com/multica-ai/multica/server/pkg/executiondefaults"
 )
 
 //go:embed builtin_skills
@@ -98,7 +101,22 @@ func loadBuiltinSkills(agentSystemKey string) []AgentSkillData {
 }
 
 func loadBuiltinSkillDirs(include func(name string) bool) []AgentSkillData {
-	return loadSkillDirs(builtinSkillsFS, builtinSkillsRoot, include)
+	// Legacy clients receive the same canonical defaults that new daemons embed locally.
+	skills := loadSkillDirs(builtinSkillsFS, builtinSkillsRoot, func(name string) bool {
+		return !executiondefaults.Owns("builtin", executiondefaults.BuiltinSkillID(name)) && include(name)
+	})
+	for _, local := range executiondefaults.Skills() {
+		if !include(local.Name) {
+			continue
+		}
+		skill := AgentSkillData{Name: local.Name, Content: local.Content}
+		for _, file := range local.Files {
+			skill.Files = append(skill.Files, AgentSkillFileData{Path: file.Path, Content: file.Content})
+		}
+		skills = append(skills, skill)
+	}
+	sort.Slice(skills, func(i, j int) bool { return skills[i].Name < skills[j].Name })
+	return skills
 }
 
 func loadSkillDirs(fsys embed.FS, root string, include func(name string) bool) []AgentSkillData {

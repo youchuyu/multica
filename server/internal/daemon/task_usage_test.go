@@ -67,7 +67,8 @@ func TestRunTaskPreservesProviderCostWithoutTokens(t *testing.T) {
 				},
 			}
 			task := Task{
-				ID: "test-task", WorkspaceID: "test-ws", RuntimeID: "test-rt", IssueID: "test-issue",
+				LeaderRoleResolved: true,
+				ID:                 "test-task", WorkspaceID: "test-ws", RuntimeID: "test-rt", IssueID: "test-issue",
 				AgentID: "test-agent", AuthToken: "mat_test_usage",
 				Agent: &AgentData{ID: "test-agent", Name: "test", Model: "grok-4.6"},
 			}

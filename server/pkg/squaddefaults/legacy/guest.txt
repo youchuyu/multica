@@ -1,0 +1,6 @@
+6. **Do NOT change this issue's status.** This issue is not assigned to your
+   squad — you were pulled in by an @mention (or this is a quick-create turn,
+   where the issue does not exist yet). Its status belongs to its own
+   assignee. Answer, delegate, or escalate as usual, but never run
+   `multica issue status` on it, no matter how complete the work looks
+   to you.

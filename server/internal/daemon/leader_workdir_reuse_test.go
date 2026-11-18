@@ -34,7 +34,7 @@ func TestRunTaskSquadLeaderReusesWorkdirBeforeGCMetaWritten(t *testing.T) {
 	d, argsFile, cleanup := newLeaderReuseTestDaemon(t)
 	defer cleanup()
 
-	first := leaderReuseTestTask("task-first")
+	first := modernLeaderReuseTestTask("task-first")
 	first.WorkspaceSlug = "original-workspace"
 	first.IssueIdentifier = "MUL-6063"
 	firstResult, err := d.runTask(context.Background(), first, "claude", 0, d.logger)
@@ -51,7 +51,7 @@ func TestRunTaskSquadLeaderReusesWorkdirBeforeGCMetaWritten(t *testing.T) {
 		t.Fatalf("expected no .gc_meta.json before the completion handler runs; stat err = %v", err)
 	}
 
-	second := leaderReuseTestTask("task-second")
+	second := modernLeaderReuseTestTask("task-second")
 	// Labels are mutable display data. A renamed workspace or issue must keep
 	// reusing the recorded path rather than deriving a new root from the names.
 	second.WorkspaceSlug = "renamed-workspace"
@@ -84,7 +84,7 @@ func TestRunTaskSquadLeaderDoesNotReuseExternalPriorWorkdir(t *testing.T) {
 	defer cleanup()
 
 	externalWorkDir := t.TempDir()
-	task := leaderReuseTestTask("task-external")
+	task := modernLeaderReuseTestTask("task-external")
 	task.PriorSessionID = "session-leader-reuse"
 	task.PriorWorkDir = externalWorkDir
 
@@ -448,15 +448,28 @@ func writeChatManagedEnvProvenance(t *testing.T, workDir, workspaceID, chatSessi
 	}
 }
 
+func modernLeaderReuseTestTask(id string) Task {
+	task := leaderReuseTestTask(id)
+	facts := localSquadFixture()
+	task.LeaderRoleResolved = true
+	task.SquadID, task.SquadName = facts.SquadID, facts.SquadName
+	task.Agent.SquadContext = facts.Agent.SquadContext
+	task.Agent.SquadContext.LeaderID = task.AgentID
+	guest := false
+	task.Agent.SquadContext.OwnsParentStatus = &guest
+	return task
+}
+
 func leaderReuseTestTask(id string) Task {
 	return Task{
-		ID:           id,
-		WorkspaceID:  "ws-leader",
-		RuntimeID:    "rt-leader",
-		IssueID:      "issue-leader",
-		AgentID:      "agent-leader",
-		AuthToken:    "mat_leader_reuse",
-		IsLeaderTask: true,
+		ID:                 id,
+		WorkspaceID:        "ws-leader",
+		RuntimeID:          "rt-leader",
+		IssueID:            "issue-leader",
+		AgentID:            "agent-leader",
+		AuthToken:          "mat_leader_reuse",
+		IsLeaderTask:       true,
+		LeaderRoleResolved: true,
 		Agent: &AgentData{
 			ID:   "agent-leader",
 			Name: "leader-agent",
@@ -787,7 +800,7 @@ func TestRunTaskCancelledWaitingForThePriorWorkdirStopsInsteadOfPreparing(t *tes
 	d, _, cleanup := newLeaderReuseTestDaemon(t)
 	defer cleanup()
 
-	first := leaderReuseTestTask("task-first")
+	first := modernLeaderReuseTestTask("task-first")
 	firstResult, err := d.runTask(context.Background(), first, "claude", 0, d.logger)
 	if err != nil {
 		t.Fatalf("first runTask: %v", err)
@@ -795,7 +808,7 @@ func TestRunTaskCancelledWaitingForThePriorWorkdirStopsInsteadOfPreparing(t *tes
 
 	// The predecessor, still holding its env root when the successor starts.
 	d.envRootBusyWait = time.Hour
-	second := leaderReuseTestTask("task-second")
+	second := modernLeaderReuseTestTask("task-second")
 	second.PriorSessionID = firstResult.SessionID
 	second.PriorWorkDir = firstResult.WorkDir
 	held, _, _, ok, err := d.lockReusablePriorEnvRoot(context.Background(), second, nil, "")
@@ -1080,7 +1093,7 @@ func TestRunTaskDeclinesReuseWhenTheClaimedDirectoryIsSwappedBeforeUse(t *testin
 	defer cleanup()
 	_ = argsFile
 
-	first := leaderReuseTestTask("task-first")
+	first := modernLeaderReuseTestTask("task-first")
 	firstResult, err := d.runTask(context.Background(), first, "claude", 0, d.logger)
 	if err != nil {
 		t.Fatalf("first runTask: %v", err)
@@ -1111,7 +1124,7 @@ func TestRunTaskDeclinesReuseWhenTheClaimedDirectoryIsSwappedBeforeUse(t *testin
 	}
 	t.Cleanup(func() { reuseBeforeUseTestHook = nil })
 
-	second := leaderReuseTestTask("task-second")
+	second := modernLeaderReuseTestTask("task-second")
 	second.PriorSessionID = firstResult.SessionID
 	second.PriorWorkDir = firstResult.WorkDir
 	secondResult, err := d.runTask(context.Background(), second, "claude", 0, d.logger)
