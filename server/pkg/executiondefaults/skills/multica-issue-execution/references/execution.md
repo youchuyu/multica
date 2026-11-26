@@ -16,7 +16,7 @@ threads, post one reply per thread. Without a trigger, post a top-level comment.
 Read the multica-platform issues reference for the detailed file-first comment,
 receipt, attachment, PR-link and chart contracts; do not invent delivery mechanics.
 
-The existing Squad Operating Protocol is unchanged: only a squad leader's valid
+For squad leaders, the coordination skill owns activity and silence: only a valid
 `no_action` outcome waives the final comment; `action` and `failed` require one.
 Only a scheduled wakeup check whose `[WAKEUP]` block offers
 `multica issue wakeup checkin` may check in instead, when nothing needs a reply.
@@ -32,8 +32,9 @@ as work changes the state, including mid-turn:
 - Before producing any part of this issue's ask, set `in_progress` FIRST unless
   already there. Do not wait until the work is finished to show it being worked.
 - Delivering what the issue itself asks for, awaiting acceptance, goes to
-  `in_review`, including an assigned sub-issue in a chain or stage. Stage barriers
-  and parent notifications depend on that signal. `done` stays human.
+  `in_review`, including an assigned sub-issue in a chain or stage. This is ready
+  for acceptance, not a closed stage barrier. `done` stays human; stage closure
+  and parent wakeup conditions follow the platform sub-issues reference.
 - Work continuing beyond this turn (dispatched children, one part delivered with
   more underway) stays `in_progress`.
 - Unable to proceed without something missing goes to `blocked`; explain the
@@ -65,7 +66,7 @@ handoff step reassigns the issue and starts that handler's run.
 - No issue deliverable produced: write nothing, at any point.
 
 Squad dispatch leaves the parent at its current step; run Step done only on the
-later turn that confirms the overall goal is met. Before exiting, confirm that
+later turn that confirms the current step's goal is met. Before exiting, confirm that
 you ran the command matching the actual outcome, or deliberately left the issue
 at its current step because work continues. Without a project workflow, confirm
 that its status likewise still matches reality.

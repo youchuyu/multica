@@ -7,13 +7,13 @@ allowed-tools: Bash(multica *)
 
 # Squad coordination
 
-Use this skill only when Agent Identity or Squad Operating Protocol identifies
+Use this skill only when the runtime identifies
 you as the squad leader. Coordinate; do not implement the task yourself, even
 when its wording asks you to. Your runtime brief owns identity, instruction
 precedence, comment policy, and parent-status authority. Follow its owning,
 guest, or project-workflow status rules exactly; this skill grants no additional
 status authority and does not replace the general issue workflow. Follow the
-runtime's Definition Boundaries when user-defined process conflicts with defaults.
+user Agent/Squad definitions when their process differs from these defaults.
 
 This cycle applies only to turns on an existing issue. Quick-create has no
 current issue: follow its create-once workflow instead, without issue reads,
@@ -23,14 +23,15 @@ not authorize those operations.
 ## Each trigger
 
 1. Read the current issue, acceptance criteria, trigger and relevant new activity.
-   Use the runtime's bounded comment reads. Check what members already did or
+   Use the issue-execution skill's bounded comment reads. Check what members already did or
    are doing before dispatching duplicate work.
 2. Decide whether to delegate a next step, answer a coordination question,
    escalate a blocker to the human reporter, or close the loop. Match work to
    the skills and roles in the Squad Roster. If no member fits, explain the gap
    and mention the reporter if possible; do not silently do the work yourself.
-3. When delegation is needed, post a single comment on this issue with the
-   chosen member's exact roster mention markdown:
+3. Choose one dispatch path: a roster mention on this issue, or an assigned
+   `todo` child as described below. For the mention path, post a single comment
+   with the chosen member's exact roster mention markdown:
    `[@Name](mention://<type>/<UUID>)`. Plain `@name` does not trigger anyone;
    never invent members or mention links. Give the member an actionable task
    under the runtime comment policy. For a project-workflow step, delegate only
@@ -74,6 +75,25 @@ mentioning the same worker on the parent for the same work starts a duplicate
 parallel run. Never do both. Prefer the roster-mention path for ordinary squad
 coordination; creating sub-issues is not a requirement of this skill.
 
-For a correction to an already-running worker, follow the runtime's steering
-rule only if one is supplied; do not guess unsupported flags or assume a normal
-comment reaches a running turn. New work remains a normal delegation.
+For a correction to an already-running worker, open the installed platform
+skill's mentions reference and follow its steering contract. A normal comment
+does not reach a running turn immediately. New work remains a normal delegation.
+
+## Parent status and wrap-up
+
+Current runtime permissions decide whether you may change parent status. Guest
+leaders never change it; a moved workflow binding forbids all status changes.
+Owners open `references/execution.md` in the installed issue-execution skill
+directory before status decisions. Without a project workflow, set the parent to `in_progress`
+on first assignment and keep it there while members work. On a later member-update
+or stage-barrier turn that verifies the overall goal, move it to `in_review`
+even without another comment asking you to; leave `done` to human review or
+existing integrations. With a project workflow, leave the current step unchanged
+on dispatch and run its Step done command once the current step’s goal is met,
+even without another request. User definitions and permission restrictions still
+apply. Roster or project membership alone grants no status authority.
+
+When wrapping up, verify acceptance against member results, summarize the outcome
+and any remaining gaps, and record activity. A successful dispatch is not parent
+completion. Follow user-defined review and handoff requirements before closing
+the coordination loop.

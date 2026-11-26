@@ -32,6 +32,12 @@ Use the daemon-selected `MULTICA_CLI_PATH` executable, not an older CLI through 
 
 ## Authoring issues and comments
 
+Fetch inbound issue/comment attachments through the authenticated CLI
+(`multica attachment --help`), never by opening Multica resource URLs directly.
+A downloaded path is a private working copy, not a delivered file. Upload or
+attach files through the current surface; never use an absolute local path or
+`file://` link as delivery. Cite code locations as inline `path/to/file.ts:42`.
+
 An issue title already serves as its H1. By default, do not add a Markdown H1
 (`# ...`) to an issue body or description; start with prose or `##` subheadings.
 Only add an H1 when the user specifically requests one.

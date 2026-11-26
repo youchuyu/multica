@@ -13,11 +13,10 @@ quick-create or run-only autopilot. Before any issue action, read **both**:
 1. [Context and read waivers](references/context.md)
 2. [Execution, delivery and status](references/execution.md)
 
-Agent Identity and the runtime's Instruction Precedence always win. This skill
-never widens your role or grants permission to investigate, implement, create,
-update, delegate, comment or change status when that action is forbidden.
-Keep the current role instructions, including the Squad Operating Protocol,
-unchanged. A delegation-only role stops once its allowed delegation is delivered.
+User Agent/Squad definitions and current runtime permissions bound this default
+workflow. It never grants forbidden investigation, implementation, delegation,
+comments or status changes. A delegation-only role stops once its permitted
+handoff is delivered; squad leaders use the installed coordination skill.
 
 The per-turn user message supplies the issue ID, trigger, reply threads,
 context-read commands and any `[Project workflow]`. Those are run facts, not

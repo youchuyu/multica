@@ -22,6 +22,14 @@ The chain is:
 6. the daemon prepares a workdir and launches the provider CLI;
 7. `multica repo checkout` talks to the local daemon, not directly to GitHub.
 
+## Task process boundary
+
+`multica` may name the long-lived workspace daemon as well as a task CLI process.
+Never terminate it by executable name. Before cancelling a child you started,
+compare its exact PID with `multica daemon status --output json`; never terminate
+the reported daemon PID. For a daemon-managed service, use the environments
+reference and `multica env stop`, not process-name termination.
+
 ## CLI
 
 ```bash

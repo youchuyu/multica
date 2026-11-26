@@ -1,8 +1,10 @@
 # Mentions and delegation
 
-What a mention link DOES. WHETHER to mention at all — loop avoidance, staying
-silent on acknowledgements — is in your runtime brief's Mentions section; follow
-that and do not re-derive it here.
+Mention links dispatch work or notify people; they are not decorative name links.
+Use them for an authorized handoff, escalation, or explicit user request. Issue
+followers already receive updates and completion notifications are platform-owned.
+Write credits, references, thanks and FYI names as plain text: an agent mention
+starts a paid run and can create courtesy loops. Silence ends conversations.
 
 - [A mention link is built from a real UUID](#a-mention-link-is-built-from-a-real-uuid)
 - [Step 1 — look up the UUID](#step-1--look-up-the-uuid)

@@ -139,12 +139,10 @@ the backend adds the new leader as a squad member with role `leader`.
 
 ## Leader briefing
 
-For squad leader tasks, Multica appends a squad leader briefing to the leader
-agent instructions. The briefing includes:
-
-- Squad Operating Protocol;
-- Squad Roster;
-- Squad Instructions, only when `instructions` is non-empty.
+For squad leader tasks, the local runtime supplies leader identity, current
+parent-status authority, the Squad Roster and user Squad instructions (when
+non-empty). The installed coordination skill owns the leader procedure; older
+clients may receive the full operating protocol in their briefing.
 
 Roster entries include member name, member type, mention markdown, and non-empty
 role. For agent members the roster also lists their assigned skills
