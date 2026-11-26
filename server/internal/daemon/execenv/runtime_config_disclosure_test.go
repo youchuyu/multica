@@ -42,10 +42,10 @@ func TestPlatformOperationDisclosureMatrix(t *testing.T) {
 					if strings.Contains(brief, "## Issue Body Formatting") == reduced {
 						t.Fatal("formatting fallback gate mismatch")
 					}
-					requirePhrases(t, brief, "Never create a PR.", "MULTICA_CLI_PATH", "Runtime-local paths are never deliverables", "Do not merge them")
-					if reduced {
-						requirePhrases(t, brief, "Before any Multica platform action", "BEFORE acting", "Skill availability does not authorize mutations")
-						if strings.Contains(availableCommandsSection(t, brief), "[--due-date") {
+					requirePhrases(t, brief, "Never create a PR.", "MULTICA_CLI_PATH", "Runtime-local paths are never deliverables")
+					if reduced && surface != "issue" {
+						requirePhrases(t, brief, "Before acting, load the installed contract(s)", skill.Name+" (platform actions)", "JSON stdout and diagnostic stderr are separate", "Skill availability does not authorize mutations")
+						if strings.Contains(brief, "[--due-date") {
 							t.Fatal("command catalog duplicated")
 						}
 						if surface == "issue" {
@@ -54,7 +54,7 @@ func TestPlatformOperationDisclosureMatrix(t *testing.T) {
 								t.Fatal("receipt method duplicated")
 							}
 						}
-					} else if surface == "issue" {
+					} else if surface == "issue" && !reduced {
 						requirePhrases(t, brief, "Gate the cleanup on the post succeeding", "empty stdout alone does not prove success")
 					}
 				})

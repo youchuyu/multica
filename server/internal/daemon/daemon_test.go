@@ -6865,7 +6865,7 @@ func TestBuildPromptSquadLeaderReplyCommandCarvesOutNoAction(t *testing.T) {
 		},
 	}, "claude")
 
-	if !strings.Contains(prompt, "Unless your outcome is `no_action`, post your reply as a comment") {
+	if !strings.Contains(prompt, "Unless this turn successfully recorded `no_action` activity, post your reply as a comment") {
 		t.Fatalf("leader prompt missing the carve-out reply imperative\n---\n%s", prompt)
 	}
 	if strings.Contains(prompt, "Post your reply as a comment") {

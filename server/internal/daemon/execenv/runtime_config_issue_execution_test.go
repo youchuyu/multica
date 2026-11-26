@@ -38,13 +38,13 @@ func TestIssueExecutionSkillRouting(t *testing.T) {
 						ctx.AgentSkills = []SkillContextForEnv{s}
 					}
 					out := buildMetaSkillContent(provider, ctx)
-					requirePhrases(t, out, "Keep this role exactly unchanged.", "## Instruction Precedence", "source_context", "multica issue comment add")
+					requirePhrases(t, out, "Keep this role exactly unchanged.", "multica issue comment add")
 					if strings.Contains(out, ctx.IssueID) || strings.Contains(out, "run-trigger-unique") {
 						t.Fatal("per-run identity leaked into stable brief")
 					}
 					if installed == "builtin" || installed == "renamed" {
-						requirePhrases(t, out, "before any issue action, read the `"+slug+"` skill", "BOTH `references/context.md` and `references/execution.md`", "only valid read waivers", "terminal output or run logs")
-						if strings.Contains(out, "1. Read the issue") {
+						requirePhrases(t, out, "## Definition Boundaries", "Never dispatch the same work by both assignment and mention", slug+" (every issue turn)", "Terminal output and run logs are not user delivery")
+						if strings.Contains(out, "1. Read the issue") || strings.Contains(out, "## Issue Body Formatting") || strings.Contains(out, "Gate the cleanup on the post succeeding") {
 							t.Fatal("full workflow duplicated despite installed skill")
 						}
 					} else {
@@ -74,9 +74,9 @@ func TestIssueExecutionSkillProjectAndLeaderBoundaries(t *testing.T) {
 		for _, workflow := range []bool{false, true} {
 			ctx := TaskContextForEnv{IssueID: "issue", IsSquadLeader: true, HasProjectWorkflow: workflow, AgentSkills: []SkillContextForEnv{issueExecutionFixture("allocated-execution")}}
 			out := buildMetaSkillContent(provider, ctx)
-			requirePhrases(t, out, "delegation-only role stops", "unless your outcome is `no_action`", "`action`, `failed`")
+			requirePhrases(t, out, "delegation-only role", "After successfully recording no_action activity for this turn", "must stay silent", "coordination Skill fallback", "action/failed require a comment")
 			if workflow {
-				requirePhrases(t, out, "use only its commands", "not built-in status assumptions")
+				requirePhrases(t, out, "[Project workflow] alone defines status commands")
 				if strings.Contains(out, "set `in_progress` before") {
 					t.Fatal("project workflow received built-in status instructions")
 				}

@@ -10871,9 +10871,9 @@ func convertSkillsForEnv(skills []SkillData) []execenv.SkillContextForEnv {
 			Description: s.Description,
 			Content:     s.Content,
 		}
-		// Legacy full-skill responses omit Source and give only workspace
-		// skills an ID, matching the server's bundle source classification.
-		if s.Source == skillbundle.SourceBuiltin || (s.Source == "" && s.ID == "") {
+		// Anonymous payloads remain visible user content, not execution entrypoints.
+		// Exact legacy defaults are normalized before the local merge.
+		if s.Source == skillbundle.SourceBuiltin {
 			result[i].BuiltinName = s.Name
 		}
 		for _, f := range s.Files {

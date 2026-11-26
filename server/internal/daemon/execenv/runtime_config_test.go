@@ -83,6 +83,14 @@ func TestSubIssueCreationSectionPresentForIssueRuns(t *testing.T) {
 func TestIssueWorkflowCarriesSourceContextPrecedenceOnce(t *testing.T) {
 	t.Parallel()
 	for _, skills := range [][]SkillContextForEnv{nil, {issueExecutionFixture("allocated-execution")}} {
+		if len(skills) > 0 {
+			out := buildMetaSkillContent("claude", TaskContextForEnv{IssueID: "issue-1", AgentSkills: skills})
+			requirePhrases(t, out, "allocated-execution (every issue turn)")
+			if strings.Contains(out, "source_context") {
+				t.Fatal("installed execution methods duplicated in runtime")
+			}
+			continue // TestIssueExecutionSkillContracts owns the source-context method.
+		}
 		out := buildMetaSkillContent("claude", TaskContextForEnv{IssueID: "issue-1", AgentSkills: skills})
 		if count := strings.Count(out, "`source_context`"); count != 1 {
 			t.Fatalf("source-context precedence rule count = %d, want 1", count)
@@ -1996,7 +2004,7 @@ func TestMultiThreadReplyInstructionsFanOut(t *testing.T) {
 		"OLDEST thread first",
 		// MUL-5825: the posting mechanism is a pointer at the brief's
 		// canonical section plus the one multi-thread-specific delta.
-		"`## Comment Formatting`",
+		"platform Skill issues reference",
 		"DISTINCT body file per thread",
 		"never reuse a `--parent` from an earlier turn",
 	} {

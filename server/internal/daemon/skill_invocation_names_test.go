@@ -138,8 +138,8 @@ func TestRunTaskListsAllocatedSkillInvocationName(t *testing.T) {
 		t.Fatalf("user-owned skill changed: %q, %v", got, err)
 	}
 	for _, want := range []string{
-		"load the `multica-platform-multica-multica` skill and open the reference(s)",
-		"Before creating sub-issues, read `references/sub-issues.md` in the `multica-platform-multica-multica` skill",
+		"multica-platform-multica-multica (platform actions)",
+		"follow their reference routing",
 	} {
 		if !strings.Contains(string(brief), want) {
 			t.Errorf("runtime brief lost platform hint %q", want)

@@ -25,7 +25,7 @@ func TestBuildIssueStateHintUnchangedReplacesTheRead(t *testing.T) {
 		"The issue is unchanged since your last run",
 		"the server compared title and description",
 		"status: in_progress; assignee: agent agent-1",
-		"That answers workflow step 1",
+		"This satisfies the issue-read requirement",
 		"only if resumed memory is not enough",
 	} {
 		if !strings.Contains(hint, want) {

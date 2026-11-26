@@ -59,7 +59,7 @@ func BuildIssueStateHint(issueID, issueStatus, assigneeType, assigneeID string, 
 	if len(changedFields) == 0 {
 		return fmt.Sprintf(
 			"The issue is unchanged since your last run — the server compared title and description (%s). "+
-				"That answers workflow step 1: continue from your resumed context, and re-read with %s only if resumed memory is not enough.\n\n",
+				"This satisfies the issue-read requirement: continue from your resumed context, and re-read with %s only if resumed memory is not enough.\n\n",
 			state, readCommand,
 		)
 	}

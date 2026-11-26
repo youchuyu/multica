@@ -387,11 +387,11 @@ func buildPromptBody(task Task, provider string) string {
 		b.WriteString("\n")
 	}
 	fmt.Fprintf(&b, "Start by running `multica issue get %s --output json` to understand your task, then complete it.\n", task.IssueID)
-	// Workflow step 2 owns the catch-up rule for every issue turn; this line
+	// The issue execution contract owns the catch-up rule; this line
 	// only hands over the commands. It used to add "(assignment-triggered tasks
 	// treat the read as mandatory)", which read as if comment-triggered turns
 	// did not (MUL-6984).
-	fmt.Fprintf(&b, "For comment history, workflow step 2 applies. Scan the threads first with `multica issue comment list %s --roots-only --summary --compact --output json`, then expand only what matters with `--thread <thread-id> --tail 30`. For `--since` incremental polling, pagination, and folding, see `multica issue comment list --help`.\n", task.IssueID)
+	fmt.Fprintf(&b, "Read comment history under the issue execution contract. Scan the threads first with `multica issue comment list %s --roots-only --summary --compact --output json`, then expand only what matters with `--thread <thread-id> --tail 30`. For `--since` incremental polling, pagination, and folding, see `multica issue comment list --help`.\n", task.IssueID)
 	return b.String()
 }
 

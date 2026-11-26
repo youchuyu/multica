@@ -90,7 +90,7 @@ func TestBuildCommentReplyInstructionsNonCodexLinux(t *testing.T) {
 					// the brief's Comment Formatting; the cookbook keeps the
 					// file-first order, the command, and the pointer.
 					"Write the body file first",
-					"## Comment Formatting",
+					"platform Skill issues reference",
 					"#4182",
 					"Keep the `&&`",
 					"do NOT reuse --parent values from previous turns",
@@ -154,7 +154,7 @@ func TestBuildCommentReplyInstructionsWindowsUsesContentFile(t *testing.T) {
 				"Write the body file first",
 				"never pipe via `--content-stdin`",
 				"PowerShell drops non-ASCII",
-				"## Comment Formatting",
+				"platform Skill issues reference",
 			} {
 				if !strings.Contains(got, want) {
 					t.Errorf("%s reply instructions missing %q\n---\n%s", provider, want, got)
@@ -303,7 +303,7 @@ func TestInjectRuntimeConfigWindowsAssignmentBriefStaysFileOnly(t *testing.T) {
 			}
 			s := string(data)
 
-			// The Windows Comment Formatting section is file-only.
+			// The legacy fallback Windows Comment Formatting section is file-only.
 			for _, want := range []string{
 				"## Comment Formatting",
 				"On Windows, **always write the comment body to a UTF-8 file",
@@ -343,7 +343,7 @@ func TestBuildCommentReplyInstructionsSquadLeaderCarveOut(t *testing.T) {
 	t.Parallel()
 
 	leader := BuildCommentReplyInstructions("claude", "issue-1", "comment-1", true)
-	if !strings.Contains(leader, "Unless your outcome is `no_action`, post your reply as a comment") {
+	if !strings.Contains(leader, "Unless this turn successfully recorded `no_action` activity, post your reply as a comment") {
 		t.Errorf("leader reply instructions missing the no_action carve-out\n---\n%s", leader)
 	}
 	if strings.Contains(leader, "Post your reply as a comment") {

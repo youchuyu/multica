@@ -274,7 +274,7 @@ func TestBuildPromptSquadLeaderReplyCarveOutIgnoresTriggerAuthor(t *testing.T) {
 			},
 		}, "claude")
 
-		if !strings.Contains(out, "Unless your outcome is `no_action`, post your reply as a comment") {
+		if !strings.Contains(out, "Unless this turn successfully recorded `no_action` activity, post your reply as a comment") {
 			t.Errorf("%s-triggered leader prompt lost the no_action carve-out\n---\n%s", authorType, out)
 		}
 		// The rule is stated by the protocol in Instructions, never restated
@@ -296,7 +296,7 @@ func TestBuildPromptSquadLeaderReplyCarveOutIgnoresTriggerAuthor(t *testing.T) {
 		TriggerAuthorName:     "Worker",
 		Agent:                 &AgentData{Name: "Regular", Instructions: "You are a regular agent."},
 	}, "claude")
-	if strings.Contains(nonLeader, "Unless your outcome is `no_action`") {
+	if strings.Contains(nonLeader, "Unless this turn successfully recorded `no_action` activity") {
 		t.Errorf("non-leader prompt carries the leader-only carve-out\n---\n%s", nonLeader)
 	}
 }
@@ -415,7 +415,7 @@ func TestBuildPromptProtocolHeadingInInstructionsIsNotALeader(t *testing.T) {
 		"Squad leader no_action rule",
 		"multica squad activity",
 		"DO NOT post any comment",
-		"Unless your outcome is `no_action`",
+		"Unless this turn successfully recorded `no_action` activity",
 	} {
 		if strings.Contains(out, banned) {
 			t.Fatalf("ordinary agent prompt leaked squad-leader rule %q\n---\n%s", banned, out)
@@ -449,7 +449,7 @@ func TestBuildPromptLegacyServerKeepsBriefingBasedLeaderRole(t *testing.T) {
 		},
 	}, "claude")
 
-	if !strings.Contains(out, "Unless your outcome is `no_action`, post your reply as a comment") {
+	if !strings.Contains(out, "Unless this turn successfully recorded `no_action` activity, post your reply as a comment") {
 		t.Fatalf("legacy-server leader prompt lost the leader-only reply carve-out\n---\n%s", out)
 	}
 }
@@ -1060,7 +1060,7 @@ func TestBuildPromptNewCommentsHint(t *testing.T) {
 	if !strings.Contains(out, "multica issue comment list "+issueID+" --since "+since+" --compact --output json") {
 		t.Errorf("hint must point at the issue-wide --since delta read, got:\n%s", out)
 	}
-	if !strings.Contains(out, "reading it is the scan workflow step 2 requires") {
+	if !strings.Contains(out, "reading it is the required issue-wide comment scan") {
 		t.Errorf("hint must say the delta read answers the scan, got:\n%s", out)
 	}
 	// The full-thread read stays available for the reply itself, on --tail 30
@@ -1307,7 +1307,7 @@ func TestBuildPromptResumedDeltaUnavailableStillRequiresScan(t *testing.T) {
 		}
 		for _, banned := range []string{
 			"No other new comments on this issue since your last run",
-			"which answers the scan workflow step 2 requires",
+			"which answers the required issue-wide comment scan",
 		} {
 			if strings.Contains(out, banned) {
 				t.Errorf("resumed prompt claims an answer it does not have (%q)\n--- output ---\n%s", banned, out)
@@ -1322,7 +1322,7 @@ func TestBuildPromptResumedDeltaUnavailableStillRequiresScan(t *testing.T) {
 
 		for _, want := range []string{
 			"No other new comments on this issue since your last run",
-			"which answers the scan workflow step 2 requires",
+			"which answers the required issue-wide comment scan",
 		} {
 			if !strings.Contains(out, want) {
 				t.Errorf("authoritative empty delta lost the waiver %q\n--- output ---\n%s", want, out)
@@ -1330,7 +1330,7 @@ func TestBuildPromptResumedDeltaUnavailableStillRequiresScan(t *testing.T) {
 		}
 		// The waiver is the whole point of this branch: it must not also hand
 		// the scan over, or the two branches are indistinguishable.
-		if strings.Contains(out, "nothing here answers the scan workflow step 2 requires") {
+		if strings.Contains(out, "nothing here answers the required issue-wide comment scan") {
 			t.Errorf("authoritative empty delta rendered the unknown-delta hint\n--- output ---\n%s", out)
 		}
 	})
@@ -1640,7 +1640,7 @@ func TestBuildCommentPromptCrossThreadFansOutReplies(t *testing.T) {
 	if strings.Contains(out, "multica issue comment add") {
 		t.Errorf("cross-thread prompt re-grew embedded comment-add commands (mechanism lives in ## Comment Formatting — MUL-5825), got:\n%s", out)
 	}
-	if !strings.Contains(out, "`## Comment Formatting`") {
+	if !strings.Contains(out, "platform Skill issues reference") {
 		t.Errorf("cross-thread prompt must point at the brief's Comment Formatting mechanism, got:\n%s", out)
 	}
 

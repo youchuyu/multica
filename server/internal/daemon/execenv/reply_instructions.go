@@ -24,7 +24,7 @@ func BuildNewCommentsHint(issueID, triggerCommentID, triggerThreadID, newComment
 	// for the reply itself — it is never the wide read.
 	delta := fmt.Sprintf(
 		"%d new comment(s) on this issue since your last run, across all threads — "+
-			"the server computed this delta, and reading it is the scan workflow step 2 requires. "+
+			"the server computed this delta, and reading it is the required issue-wide comment scan. "+
 			"Read exactly those comments with "+
 			"`multica issue comment list %s --since %s --compact --output json` "+
 			"(every comment created after that anchor, in every thread — it also returns the triggering comment and your own replies, "+
@@ -74,7 +74,7 @@ func BuildResumedCommentsHint(issueID, triggerCommentID, triggerThreadID string)
 	return fmt.Sprintf(
 		"You're resuming the prior session, and the triggering comment is already included above. "+
 			"No other new comments on this issue since your last run — this turn's issue-wide delta is empty, "+
-			"which answers the scan workflow step 2 requires. "+
+			"which answers the required issue-wide comment scan. "+
 			"Triggering thread in full, if resumed memory is not enough for the reply: "+
 			"`multica issue comment list %s --thread %s --tail 30 --compact --output json`.\n\n",
 		issueID, threadID,
@@ -98,14 +98,14 @@ func BuildResumedUnknownDeltaCommentsHint(issueID, triggerCommentID, triggerThre
 	if threadID == "" {
 		return fmt.Sprintf(
 			"You're resuming the prior session, and the triggering comment is already included above. "+
-				"This turn carries no issue-wide comment delta, so nothing here answers the scan workflow step 2 requires — run it: "+
+				"This turn carries no issue-wide comment delta, so nothing here answers the required issue-wide comment scan — run it: "+
 				"`multica issue comment list %s --roots-only --summary --compact --output json`.\n\n",
 			issueID,
 		)
 	}
 	return fmt.Sprintf(
 		"You're resuming the prior session, and the triggering comment is already included above. "+
-			"This turn carries no issue-wide comment delta, so nothing here answers the scan workflow step 2 requires — run it: "+
+			"This turn carries no issue-wide comment delta, so nothing here answers the required issue-wide comment scan — run it: "+
 			"`multica issue comment list %s --roots-only --summary --compact --output json`, "+
 			"and expand what its `last_activity_at` shows has moved. "+
 			"Triggering thread in full, if resumed memory is not enough for the reply: "+
@@ -148,7 +148,7 @@ func BuildColdCommentsHint(issueID, triggerCommentID, triggerThreadID string) st
 		"Triggering thread: "+
 			"`multica issue comment list %s --thread %s --tail 30 --compact --output json` "+
 			"(that thread's root + its 30 newest replies). "+
-			"The scan workflow step 2 requires is the same command with `--roots-only --summary` in place of `--thread ... --tail 30`.\n\n",
+			"The required issue-wide comment scan is the same command with `--roots-only --summary` in place of `--thread ... --tail 30`.\n\n",
 		issueID, threadID,
 	)
 }
@@ -193,7 +193,7 @@ func buildCommentReplyInstructionsSlim(provider, issueID, triggerCommentID strin
 	// no_action rule injected above it (MUL-5442 #6493 review).
 	lead := "Post your reply as a comment — always use the trigger comment ID below, "
 	if squadLeader {
-		lead = "Unless your outcome is `no_action`, post your reply as a comment — always use the trigger comment ID below, "
+		lead = "Unless this turn successfully recorded `no_action` activity, post your reply as a comment — always use the trigger comment ID below, "
 	}
 	// Cleanup is GATED on the post succeeding, never a separate statement.
 	// Agents hand the whole snippet to one shell call, and an unconditional
@@ -220,7 +220,7 @@ func buildCommentReplyInstructionsSlim(provider, issueID, triggerCommentID strin
 		return fmt.Sprintf(
 			lead+
 				"do NOT reuse --parent values from previous turns in this session.\n\n"+
-				"Write the body file first — never pipe via `--content-stdin` (PowerShell drops non-ASCII; full rules: ## Comment Formatting above). Use the variant for the shell your command tool runs:\n\n"+
+				"Write the body file first — never pipe via `--content-stdin` (PowerShell drops non-ASCII; full rules: the platform Skill issues reference). Use the variant for the shell your command tool runs:\n\n"+
 				"PowerShell:\n\n"+
 				"    multica issue comment add %[1]s --parent %[2]s --content-file ./reply.md --output table\n"+
 				"    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }\n"+
@@ -235,7 +235,7 @@ func buildCommentReplyInstructionsSlim(provider, issueID, triggerCommentID strin
 	return fmt.Sprintf(
 		lead+
 			"do NOT reuse --parent values from previous turns in this session.\n\n"+
-			"Write the body file first (rules: ## Comment Formatting above — MUL-2904 / #4182):\n\n"+
+			"Write the body file first (rules: the platform Skill issues reference — MUL-2904 / #4182):\n\n"+
 			"    multica issue comment add %s --parent %s --content-file ./reply.md --output table && rm ./reply.md\n\n"+
 			"Keep the `&&`: as two separate statements a failed post is masked by the cleanup's success, and the body file is deleted.\n\n"+
 			"Do NOT write literal `\\n` escapes to simulate line breaks; the file preserves real newlines.\n",
@@ -297,13 +297,13 @@ func BuildMultiThreadCommentReplyInstructions(issueID string, targets []ThreadRe
 	// byte-for-byte.
 	lead := "This run coalesced comments from %d DISTINCT threads. Post ONE reply per thread"
 	if squadLeader {
-		lead = "This run coalesced comments from %d DISTINCT threads. **If your outcome is `no_action`, skip this ENTIRE fan-out block — post no replies at all and exit via `multica squad activity` as your leader rules direct; everything below applies only otherwise.** Otherwise, post ONE reply per thread"
+		lead = "This run coalesced comments from %d DISTINCT threads. **If this turn successfully recorded `no_action` activity, skip this ENTIRE fan-out block — post no replies. If activity recording failed, skip fan-out and follow the coordination Skill failure fallback: leave one outcome/error reply only if no comment was already posted this turn. Everything below applies only to action/failed delivery, not that fallback.** Otherwise, post ONE reply per thread"
 	}
 	return fmt.Sprintf(
 		lead+" — %d in total. This OVERRIDES the \"post exactly one comment per run\" rule: for THIS run multiple replies are required and correct. Do NOT merge separate threads into one comment or post twice in the same thread.\n\n"+
 			"Reply targets, in posting order — OLDEST thread first, the newest (triggering) thread LAST. Use the exact `--parent` for each; never reuse a `--parent` from an earlier turn:\n"+
 			"%s\n"+
-			"Write and post each reply exactly as `## Comment Formatting` above directs, with ONE multi-thread delta: use a DISTINCT body file per thread (./reply-1.md, ./reply-2.md, …) so one reply's content can never leak into another's.\n",
+			"Write and post each reply exactly as the platform Skill issues reference directs, with ONE multi-thread delta: use a DISTINCT body file per thread (./reply-1.md, ./reply-2.md, …) so one reply's content can never leak into another's.\n",
 		len(targets), len(targets), targetLines,
 	)
 }

@@ -14,7 +14,7 @@ func TestConvertSkillsForEnvPreservesBuiltinIdentity(t *testing.T) {
 	}{
 		{name: "builtin ref", source: "builtin", id: "builtin:multica-platform", wantBuiltin: "multica-platform"},
 		{name: "builtin without id", source: "builtin", wantBuiltin: "multica-platform"},
-		{name: "legacy builtin", wantBuiltin: "multica-platform"},
+		{name: "anonymous legacy content"},
 		{name: "workspace ref", source: "workspace", id: "e78e3700-7776-427a-a0bb-96a6f7b41af6"},
 		{name: "legacy workspace", id: "e78e3700-7776-427a-a0bb-96a6f7b41af6"},
 		{name: "explicit workspace without id", source: "workspace"},

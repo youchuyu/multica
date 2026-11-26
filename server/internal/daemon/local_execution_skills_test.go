@@ -38,6 +38,27 @@ func TestNormalizeEquivalentLegacyExecutionSkills(t *testing.T) {
 	}
 }
 
+func TestAnonymousRemoteSkillCannotOwnLocalExecutionRoute(t *testing.T) {
+	task := Task{IssueID: "issue", Agent: &AgentData{Skills: []SkillData{{Name: executiondefaults.PlatformSkillName, Content: "stale remote prose"}}}}
+	mergeLocalExecutionSkills(&task)
+	converted := convertSkillsForEnv(task.Agent.Skills)
+	if converted[0].Content != "stale remote prose" || converted[0].BuiltinName != "" {
+		t.Fatal("anonymous remote content changed or gained builtin routing")
+	}
+	count := 0
+	for _, skill := range converted {
+		if skill.BuiltinName == executiondefaults.PlatformSkillName {
+			count++
+			if skill.Content == "stale remote prose" {
+				t.Fatal("remote prose owns local route")
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("got %d local platform routes", count)
+	}
+}
+
 func TestFilterLocalExecutionSkillRefsUsesIdentity(t *testing.T) {
 	id := executiondefaults.BuiltinSkillID(executiondefaults.PlatformSkillName)
 	keep := []SkillRefData{
