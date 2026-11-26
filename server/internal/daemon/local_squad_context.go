@@ -91,7 +91,7 @@ func prepareLocalSquadContext(task *Task) error {
 	if hasIssue && *facts.OwnsParentStatus && (task.IssueAssigneeType != "squad" || task.IssueAssigneeID != facts.SquadID) {
 		return fail("squad_context status ownership does not match the issue assignee")
 	}
-	// Full protocol is local and does not depend on any server-delivered skill prose.
-	task.Agent.SquadBriefing = squaddefaults.Render(facts.SquadName, facts.UserInstructions, facts.RosterFacts, *facts.OwnsParentStatus, workflow, true, false, hasIssue)
+	// Local identity and permissions never depend on server-delivered protocol prose.
+	task.Agent.SquadBriefing = squaddefaults.RenderLocal(facts.SquadName, facts.UserInstructions, facts.RosterFacts, *facts.OwnsParentStatus, workflow, hasIssue)
 	return nil
 }

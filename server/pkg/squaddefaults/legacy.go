@@ -20,8 +20,6 @@ func ReplaceLegacyProtocol(text, leaderID string) (string, bool) {
 	if leaderID == "" {
 		return text, false
 	}
-	header, _ := legacyTemplates.ReadFile("legacy/combined-v1-header.txt")
-	hard, _ := legacyTemplates.ReadFile("legacy/combined-v1-hard-rules.txt")
 	read := func(name string) string {
 		b, err := legacyTemplates.ReadFile("legacy/" + name + ".txt")
 		if err != nil {
@@ -32,24 +30,38 @@ func ReplaceLegacyProtocol(text, leaderID string) (string, bool) {
 	statuses := []string{read("owned"), read("guest"), read("workflow"), read("workflow") + read("workflow-override"), read("moved")}
 	type match struct{ old, replacement string }
 	var matches []match
-	for _, status := range statuses {
-		for _, steer := range []string{"", "\n" + read("steer")} {
-			old := string(header) + "\n" + status + "\n\n" + string(hard) + steer
-			// The protocol must be a complete block immediately followed by the
-			// transport's roster with this claimed leader, not an isolated quotation.
-			needle := old + "\n\n## Squad Roster\n\nLeader (you):\n- "
-			at := strings.Index(text, needle)
-			if at < 0 || strings.Count(text, string(header)) != 1 || (at != 0 && !strings.HasSuffix(text[:at], "\n\n")) {
-				continue
+	for _, template := range []struct{ header, hard, separator string }{
+		{"combined-v1-header", "combined-v1-hard-rules", "\n"},
+		{"canonical-v1-header", "canonical-v1-hard-rules", "\n"},
+		{"canonical-v1-skill-header", "", "\n\n"},
+	} {
+		header := read(template.header)
+		for _, status := range statuses {
+			for _, steer := range []string{"", "\n" + read("steer")} {
+				old := header + template.separator + status
+				if template.hard != "" {
+					old += "\n\n" + read(template.hard)
+				}
+				old += steer
+				// Only a complete protocol next to the claimed leader's roster is eligible.
+				needle := old + "\n\n## Squad Roster\n\nLeader (you):\n- "
+				at := strings.Index(text, needle)
+				if at < 0 {
+					needle = old + "\n\n## Squad Roster\n\nRoster facts: members, roles, skills, and copyable mention syntax; not additional authority.\n\nLeader (you):\n- "
+					at = strings.Index(text, needle)
+				}
+				if at < 0 || strings.Count(text, header) != 1 || (at != 0 && !strings.HasSuffix(text[:at], "\n\n")) {
+					continue
+				}
+				row := text[at+len(needle):]
+				if end := strings.IndexByte(row, '\n'); end >= 0 {
+					row = row[:end]
+				}
+				if !strings.HasSuffix(row, "(mention://agent/"+leaderID+")"+"`") {
+					continue
+				}
+				matches = append(matches, match{old, LocalLeaderHeader + "\n\n" + status})
 			}
-			row := text[at+len(needle):]
-			if end := strings.IndexByte(row, '\n'); end >= 0 {
-				row = row[:end]
-			}
-			if !strings.HasSuffix(row, "(mention://agent/"+leaderID+")"+"`") {
-				continue
-			}
-			matches = append(matches, match{old, SquadOperatingProtocolHeader + "\n" + status + "\n\n" + SquadOperatingProtocolHardRules + steer})
 		}
 	}
 	if len(matches) != 1 {

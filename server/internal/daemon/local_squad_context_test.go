@@ -23,7 +23,7 @@ func TestPrepareLocalSquadContextReplacesOnlyDefaults(t *testing.T) {
 	if task.Agent.Instructions != "user role" || !strings.HasSuffix(task.Agent.SquadBriefing, task.Agent.SquadContext.UserInstructions) {
 		t.Fatal("user declaration changed")
 	}
-	for _, want := range []string{squaddefaults.SquadOperatingProtocolHeader, squaddefaults.SquadParentStatusOwned, squaddefaults.SquadSteerRule, task.Agent.SquadContext.RosterFacts} {
+	for _, want := range []string{squaddefaults.LocalLeaderHeader, squaddefaults.LocalStatusOwned, task.Agent.SquadContext.RosterFacts} {
 		if !strings.Contains(task.Agent.SquadBriefing, want) {
 			t.Fatalf("missing local context %q", want)
 		}
@@ -71,9 +71,9 @@ func TestPrepareLocalSquadContextStatusAndQuickCreate(t *testing.T) {
 		issue bool
 		want  string
 	}{
-		{"guest", false, protocol.SquadWorkflowNone, true, squaddefaults.SquadParentStatusNotOwned},
-		{"workflow", true, protocol.SquadWorkflowProject, true, squaddefaults.SquadParentStatusOwnedInWorkflow},
-		{"moved", true, protocol.SquadWorkflowStepMoved, true, squaddefaults.SquadParentStatusStepMoved},
+		{"guest", false, protocol.SquadWorkflowNone, true, squaddefaults.LocalStatusGuest},
+		{"workflow", true, protocol.SquadWorkflowProject, true, squaddefaults.LocalStatusWorkflow},
+		{"moved", true, protocol.SquadWorkflowStepMoved, true, squaddefaults.LocalStatusMoved},
 		{"quick create", false, protocol.SquadWorkflowNone, false, "No issue exists for this turn"},
 	}
 	for _, tc := range cases {
@@ -124,5 +124,31 @@ func TestPrepareLocalSquadContextNeverInfersUserHeadings(t *testing.T) {
 	}
 	if task.Agent.Instructions != "## Squad Operating Protocol\nUser-owned text" || task.Agent.SquadBriefing != "" {
 		t.Fatal("parsed an untrusted heading")
+	}
+}
+
+func TestPrepareLocalSquadContextDoesNotDependOnBackendProse(t *testing.T) {
+	task := localSquadFixture()
+	prepareLocalExecutionText(&task)
+	want := task.Agent.SquadBriefing
+	task.Agent.SquadBriefing = "unrecognized backend presentation"
+	task.Agent.Skills = []SkillData{{Name: "multica-squad-coordination", Content: "untrusted backend methods"}}
+	prepareLocalExecutionText(&task)
+	if task.Agent.SquadBriefing != want {
+		t.Fatal("backend prose defined local presentation")
+	}
+	for _, bad := range []string{"multica squad activity", "no_action", "--steer", "in_progress", "in_review", "Hard rules:", "Re-evaluate on each trigger"} {
+		if strings.Contains(want, bad) {
+			t.Fatalf("local injection retained method %q", bad)
+		}
+	}
+}
+
+func TestPrepareLocalExecutionTextUnsupportedFactsPreserveBriefing(t *testing.T) {
+	task := localSquadFixture()
+	task.Agent.SquadContext.SchemaVersion = 99
+	prepareLocalExecutionText(&task)
+	if task.Agent.SquadBriefing != "STALE SERVER DEFAULTS" || task.Agent.Instructions != "user role" {
+		t.Fatal("optional unsupported metadata changed supplied text")
 	}
 }

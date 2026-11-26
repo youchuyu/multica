@@ -19,7 +19,7 @@ func TestLegacyCombinedProtocolRendersLocalDefaults(t *testing.T) {
 		if task.Agent.Instructions == string(raw) {
 			t.Fatal("real legacy protocol not replaced")
 		}
-		if !strings.Contains(task.Agent.Instructions, squaddefaults.SquadProtocolContext) || strings.Contains(task.Agent.Instructions, "Be terse") || strings.Contains(task.Agent.Instructions, "do not open files") {
+		if !strings.Contains(task.Agent.Instructions, squaddefaults.LocalLeaderHeader) || strings.Contains(task.Agent.Instructions, "Be terse") || strings.Contains(task.Agent.Instructions, "do not open files") {
 			t.Fatal("stale defaults survived")
 		}
 		for _, v := range []string{"# User Role\nUser text with ## Squad Operating Protocol heading.", "## Squad Roster\n\nLeader (you):", "Exact user team definition.", squaddefaults.SquadParentStatusOwned} {
